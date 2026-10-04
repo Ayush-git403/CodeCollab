@@ -1,7 +1,7 @@
 const rooms = {};
 const roomFiles = {};
 const fileContents = {};
-const db = require("../db");
+const db = require("../models");
 
 module.exports = (io) => {
   io.on("connection", (socket) => {
@@ -11,6 +11,29 @@ module.exports = (io) => {
       if (!fileContents[roomId]) fileContents[roomId] = {};
 
       rooms[roomId][socket.id] = { username, color };
+
+      // Record this user visited this room
+      if (color && username) {
+        try {
+          // Get user ID from DB by username
+          const userResult = await db.query(
+            "SELECT id FROM users WHERE username = $1",
+            [username],
+          );
+          if (userResult.rows.length > 0) {
+            const userId = userResult.rows[0].id;
+            await db.query(
+              `INSERT INTO room_members (room_id, user_id, username)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (room_id, user_id)
+         DO UPDATE SET joined_at = NOW()`,
+              [roomId, userId, username],
+            );
+          }
+        } catch (err) {
+          console.error("Room member record error:", err.message);
+        }
+      }
 
       io.to(roomId).emit("user_joined", {
         users: Object.values(rooms[roomId]),

@@ -1,6 +1,7 @@
 const express = require("express");
-const router  = express.Router();
-const db      = require("../db");
+const router = express.Router();
+const db = require("../models");
+const authMiddleware = require("../middleware/authMiddleware");
 
 // Create room
 router.post("/create", async (req, res) => {
@@ -10,7 +11,14 @@ router.post("/create", async (req, res) => {
   await db.query(
     `INSERT INTO rooms (id, name, target_output, target_type, language, time_limit)
      VALUES ($1, $2, $3, $4, $5, $6)`,
-    [roomId, name, targetOutput || "", "terminal", language || "python", timeLimit || 0]
+    [
+      roomId,
+      name,
+      targetOutput || "",
+      "terminal",
+      language || "python",
+      timeLimit || 0,
+    ],
   );
 
   res.json({ roomId });
@@ -18,12 +26,31 @@ router.post("/create", async (req, res) => {
 
 // Get room
 router.get("/:roomId", async (req, res) => {
-  const room = await db.query(
-    `SELECT * FROM rooms WHERE id = $1`,
-    [req.params.roomId]
-  );
-  if (room.rows.length === 0) return res.status(404).json({ error: "Room not found" });
+  const room = await db.query(`SELECT * FROM rooms WHERE id = $1`, [
+    req.params.roomId,
+  ]);
+  if (room.rows.length === 0)
+    return res.status(404).json({ error: "Room not found" });
   res.json(room.rows[0]);
+});
+
+// Get rooms the logged-in user has visited
+router.get("/user/mine", authMiddleware, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT r.id, r.name, r.created_at, rm.joined_at
+       FROM rooms r
+       JOIN room_members rm ON r.id = rm.room_id
+       WHERE rm.user_id = $1
+       ORDER BY rm.joined_at DESC
+       LIMIT 10`,
+      [req.user.userId],
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Get user rooms error:", err.message);
+    res.status(500).json({ error: "Failed to fetch rooms" });
+  }
 });
 
 // Save file
@@ -35,7 +62,7 @@ router.post("/save", async (req, res) => {
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (room_id, filename)
        DO UPDATE SET content = $4, saved_by = $5, saved_at = NOW()`,
-      [roomId, filename, language, content, savedBy]
+      [roomId, filename, language, content, savedBy],
     );
     res.json({ success: true });
   } catch (err) {
@@ -49,7 +76,7 @@ router.get("/:roomId/files", async (req, res) => {
   const files = await db.query(
     `SELECT filename, language, content FROM files
      WHERE room_id = $1 ORDER BY saved_at ASC`,
-    [req.params.roomId]
+    [req.params.roomId],
   );
   res.json(files.rows);
 });
@@ -59,7 +86,7 @@ router.get("/:roomId/leaderboard", async (req, res) => {
   const board = await db.query(
     `SELECT username, matched, submitted_at FROM submissions
      WHERE room_id = $1 ORDER BY matched DESC, submitted_at ASC`,
-    [req.params.roomId]
+    [req.params.roomId],
   );
   res.json(board.rows);
 });

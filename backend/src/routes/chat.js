@@ -1,6 +1,6 @@
 const express = require("express");
 const router  = express.Router();
-const db      = require("../db");
+const db      = require("../models");
 
 // GET /api/chat/:roomId?before=<ISO_TIMESTAMP>&limit=50
 // - No `before` param → fetch latest 50 messages

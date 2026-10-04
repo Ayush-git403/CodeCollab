@@ -1,5 +1,5 @@
 const anthropic = require("./anthropic");
-const db = require("../db");
+const db = require("../models");
 
 const saveMemory = async (userId, roomId, memoryType, content) => {
   await db.query(

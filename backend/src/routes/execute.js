@@ -4,7 +4,7 @@ const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const db = require("../db");
+const db = require("../models");
 
 const LANGUAGE_CONFIG = {
   python:     { ext: "py",   cmd: (f) => `python "${f}"` },
