@@ -1,299 +1,247 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
-function HoverMenu({ items }) {
-  return (
-    <div style={S.dropdown}>
-      {items.map((item, i) =>
-        item.divider ? (
-          <div key={i} style={S.dropdownDivider} />
-        ) : (
-          <div
-            key={i}
-            style={S.dropdownItem}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "#F6F8FA")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-            onClick={item.onClick}
-          >
-            <div
-              style={{
-                ...S.dropdownIconBox,
-                background: item.iconBg || "#F6F8FA",
-              }}
-            >
-              <span style={{ fontSize: "16px" }}>{item.icon}</span>
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <p style={S.dropdownItemTitle}>{item.label}</p>
-              {item.desc && (
-                <p style={S.dropdownItemDesc}>{item.desc}</p>
-              )}
-            </div>
-
-            <span style={S.dropdownArrow}>→</span>
-          </div>
-        )
-      )}
-    </div>
-  );
-}
+import { AnimatePresence, motion } from "motion/react";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  const [hoveredNav, setHoveredNav] = useState(null);
-  const [userMenuOpen, setUserMenuOpen] = useState(null);
-
+  const [hovered, setHovered] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState(null);
   const hideTimer = useRef(null);
   const navRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
       if (navRef.current && !navRef.current.contains(e.target)) {
-        setHoveredNav(null);
-        setUserMenuOpen(false);
+        setHovered(null);
+        setProfileOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handler);
-
-    return () =>
-      document.removeEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleMouseEnter = (key) => {
+  const enter = (key) => {
     clearTimeout(hideTimer.current);
-    setHoveredNav(key);
+    setHovered(key);
+    setProfileOpen(false);
   };
 
-  const handleMouseLeave = () => {
+  const leave = () => {
     hideTimer.current = setTimeout(() => {
-      setHoveredNav(null);
-    }, 120);
+      setHovered(null);
+      setHoveredItem(null);
+    }, 150);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const keepOpen = () => clearTimeout(hideTimer.current);
 
-  const workspaceItems = [
+  const navItems = [
     {
-      icon: "🏠",
-      iconBg: "#DDF4FF",
-      label: "Collaborative Rooms",
-      desc: "Code together in real time with your team",
-      onClick: () => {
-        navigate("/admin?type=room");
-        setHoveredNav(null);
-      },
+      key: "workspace",
+      label: "Workspace",
+      items: [
+        {
+          id: "collab",
+          label: "Collaborative Rooms",
+          desc: "Code together in real time with your team",
+          onClick: () => {
+            navigate("/admin?type=room");
+            setHovered(null);
+          },
+        },
+        {
+          id: "contest",
+          label: "Contest Mode",
+          desc: "Race to match the target output",
+          onClick: () => {
+            navigate("/admin?type=contest");
+            setHovered(null);
+          },
+        },
+        {
+          id: "newroom",
+          label: "New Room",
+          desc: "Start a fresh coding space instantly",
+          onClick: () => {
+            navigate("/admin");
+            setHovered(null);
+          },
+        },
+      ],
     },
     {
-      icon: "⚡",
-      iconBg: "#FFF8C5",
-      label: "Contest Mode",
-      desc: "Race to match the target output",
-      onClick: () => {
-        navigate("/admin?type=contest");
-        setHoveredNav(null);
-      },
-    },
-    { divider: true },
-    {
-      icon: "➕",
-      iconBg: "#DAFBE1",
-      label: "New Room",
-      desc: "Start a fresh coding space instantly",
-      onClick: () => {
-        navigate("/admin");
-        setHoveredNav(null);
-      },
+      key: "resources",
+      label: "Resources",
+      items: [
+        {
+          id: "docs",
+          label: "Documentation",
+          desc: "Guides, API reference and tutorials",
+        },
+        {
+          id: "how",
+          label: "How it works",
+          desc: "Learn about real-time collaboration",
+        },
+        {
+          id: "students",
+          label: "For Students",
+          desc: "Classroom mode and team projects",
+        },
+        {
+          id: "hackathons",
+          label: "For Hackathons",
+          desc: "Zero-setup team coding environment",
+        },
+      ],
     },
   ];
 
-  const resourceItems = [
+  const profileItems = [
     {
-      icon: "📖",
-      iconBg: "#F1EFFF",
-      label: "Documentation",
-      desc: "Guides, API reference and tutorials",
-      onClick: () => setHoveredNav(null),
+      id: "dashboard",
+      label: "Dashboard",
+      onClick: () => {
+        navigate("/dashboard");
+        setProfileOpen(false);
+      },
     },
     {
-      icon: "💡",
-      iconBg: "#FFF8C5",
-      label: "How it works",
-      desc: "Learn about real-time collaboration",
-      onClick: () => setHoveredNav(null),
-    },
-    { divider: true },
-    {
-      icon: "🎓",
-      iconBg: "#DDF4FF",
-      label: "For Students",
-      desc: "Classroom mode and team projects",
-      onClick: () => setHoveredNav(null),
+      id: "newroom",
+      label: "New Room",
+      onClick: () => {
+        navigate("/admin");
+        setProfileOpen(false);
+      },
     },
     {
-      icon: "🏆",
-      iconBg: "#FFEFF7",
-      label: "For Hackathons",
-      desc: "Zero-setup team coding environment",
-      onClick: () => setHoveredNav(null),
+      id: "settings",
+      label: "Settings",
+      onClick: () => {
+        setProfileOpen(false);
+      },
     },
   ];
 
   return (
     <nav ref={navRef} style={S.nav}>
       <div style={S.inner}>
-
-        {/* Logo */}
-        <div
-          style={S.logo}
-          onClick={() => navigate("/dashboard")}
-        >
-          <span style={S.logoWord1}>Code</span>
-          <span style={S.logoWord2}>Collab</span>
+        {/* Wordmark */}
+        <div style={S.logo} onClick={() => navigate("/dashboard")}>
+          <span style={S.logoBlack}>Code</span>
+          <span style={S.logoPink}>Collab</span>
         </div>
 
-        {/* Navigation */}
-        <div style={S.navLinks}>
-
-          {/* ================= WORKSPACE / RESOURCES ================= */}
-
-          <div style={S.animatedNavContainer}>
-
-            {/* Sliding background */}
+        {/* Nav links */}
+        <div style={S.links}>
+          {navItems.map((item) => (
             <div
-              style={{
-                ...S.animatedNavBackground,
-
-                opacity: hoveredNav ? 1 : 0,
-
-                transform:
-                  hoveredNav === "resources"
-                    ? "translateX(100%)"
-                    : "translateX(0)",
-
-                width: hoveredNav === "resources"
-                  ? "108px"
-                  : "112px",
-              }}
-            />
-
-            {/* Workspace */}
-            <div
-              style={{
-                ...S.navItemWrap,
-                zIndex: 2,
-              }}
-              onMouseEnter={() =>
-                handleMouseEnter("workspace")
-              }
-              onMouseLeave={handleMouseLeave}
+              key={item.key}
+              style={S.navItemWrap}
+              onMouseEnter={() => enter(item.key)}
+              onMouseLeave={leave}
             >
               <button
                 style={{
                   ...S.navBtn,
-                  color:
-                    hoveredNav === "workspace"
-                      ? "#0969DA"
-                      : "#57606A",
+                  color: hovered === item.key ? "#FFFFFF" : "#8B949E",
                 }}
               >
-                Workspace
-
-                <span
+                {item.label}
+                <motion.span
+                  animate={{ rotate: hovered === item.key ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
                   style={{
-                    ...S.chevron,
-                    transform:
-                      hoveredNav === "workspace"
-                        ? "rotate(180deg)"
-                        : "none",
-                    color:
-                      hoveredNav === "workspace"
-                        ? "#0969DA"
-                        : "#57606A",
+                    display: "inline-block",
+                    fontSize: "10px",
+                    marginLeft: "2px",
                   }}
                 >
                   ▾
-                </span>
+                </motion.span>
               </button>
 
-              {hoveredNav === "workspace" && (
-                <div
-                  onMouseEnter={() =>
-                    handleMouseEnter("workspace")
-                  }
-                  onMouseLeave={handleMouseLeave}
-                >
-                  <HoverMenu items={workspaceItems} />
-                </div>
-              )}
+              <AnimatePresence>
+                {hovered === item.key && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    style={S.panelWrap}
+                    onMouseEnter={keepOpen}
+                    onMouseLeave={leave}
+                  >
+                    <div style={S.panel}>
+                      {/* Animated items */}
+                      {item.items.map((navItem) => (
+                        <div
+                          key={navItem.id}
+                          style={{
+                            position: "relative",
+                            borderRadius: "8px",
+                            overflow: "hidden",
+                          }}
+                          onMouseEnter={() => setHoveredItem(navItem.id)}
+                          onMouseLeave={() => setHoveredItem(null)}
+                          onClick={navItem.onClick}
+                        >
+                          {/* Animated highlight */}
+                          <AnimatePresence>
+                            {hoveredItem === navItem.id && (
+                              <motion.div
+                                layoutId={`nav-highlight-${item.key}`}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{
+                                  type: "spring",
+                                  bounce: 0.2,
+                                  duration: 0.4,
+                                }}
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  background: "rgba(255,255,255,0.06)",
+                                  borderRadius: "8px",
+                                  zIndex: 0,
+                                }}
+                              />
+                            )}
+                          </AnimatePresence>
+
+                          <div
+                            style={{
+                              ...S.panelItem,
+                              position: "relative",
+                              zIndex: 1,
+                            }}
+                          >
+                            <p
+                              style={{
+                                ...S.panelItemTitle,
+                                color:
+                                  hoveredItem === navItem.id
+                                    ? "#FFFFFF"
+                                    : "#C9D1D9",
+                                transition: "color 0.15s",
+                              }}
+                            >
+                              {navItem.label}
+                            </p>
+                            <p style={S.panelItemDesc}>{navItem.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-
-            {/* Resources */}
-            <div
-              style={{
-                ...S.navItemWrap,
-                zIndex: 2,
-              }}
-              onMouseEnter={() =>
-                handleMouseEnter("resources")
-              }
-              onMouseLeave={handleMouseLeave}
-            >
-              <button
-                style={{
-                  ...S.navBtn,
-                  color:
-                    hoveredNav === "resources"
-                      ? "#0969DA"
-                      : "#57606A",
-                }}
-              >
-                Resources
-
-                <span
-                  style={{
-                    ...S.chevron,
-                    transform:
-                      hoveredNav === "resources"
-                        ? "rotate(180deg)"
-                        : "none",
-                    color:
-                      hoveredNav === "resources"
-                        ? "#0969DA"
-                        : "#57606A",
-                    transition:
-                      "transform 0.2s ease, color 0.2s ease",
-                  }}
-                >
-                  ▾
-                </span>
-              </button>
-
-              {hoveredNav === "resources" && (
-                <div
-                  onMouseEnter={() =>
-                    handleMouseEnter("resources")
-                  }
-                  onMouseLeave={handleMouseLeave}
-                >
-                  <HoverMenu items={resourceItems} />
-                </div>
-              )}
-            </div>
-
-          </div>
-
+          ))}
         </div>
 
         {/* Right */}
@@ -302,163 +250,186 @@ export default function Navbar() {
             <>
               <button
                 style={S.newRoomBtn}
-                onClick={() => navigate("/admin")}
+                onClick={() =>
+                  user ? navigate("/admin") : navigate("/login?next=admin")
+                }
               >
-                + New Room
+                New Room
               </button>
 
+              {/* Avatar */}
               <div style={{ position: "relative" }}>
                 <div
-                  style={{
-                    ...S.avatar,
-                    background: user.avatar_color,
+                  style={S.avatarWrap}
+                  onClick={() => {
+                    setProfileOpen(!profileOpen);
+                    setHovered(null);
                   }}
-                  onClick={() =>
-                    setUserMenuOpen(!userMenuOpen)
-                  }
                 >
-                  {user.username?.[0]?.toUpperCase()}
+                  <div style={{ ...S.avatar, background: user.avatar_color }}>
+                    {user.username?.[0]?.toUpperCase()}
+                  </div>
+                  <div style={S.onlineDot} />
                 </div>
 
-                {userMenuOpen && (
-                  <div
-                    style={{
-                      ...S.dropdown,
-                      right: 0,
-                      left: "auto",
-                      minWidth: "210px",
-                    }}
-                  >
-                    <div style={S.userHeader}>
-                      <div
-                        style={{
-                          ...S.avatarSm,
-                          background: user.avatar_color,
-                        }}
-                      >
-                        {user.username?.[0]?.toUpperCase()}
-                      </div>
-
-                      <div>
-                        <p style={S.userName}>
-                          {user.username}
-                        </p>
-
-                        <p style={S.userEmail}>
-                          {user.email}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div style={S.dropdownDivider} />
-
-                    {[
-                      {
-                        icon: "🏠",
-                        label: "Dashboard",
-                        onClick: () => {
-                          navigate("/dashboard");
-                          setUserMenuOpen(false);
-                        },
-                      },
-                      {
-                        icon: "➕",
-                        label: "New Room",
-                        onClick: () => {
-                          navigate("/admin");
-                          setUserMenuOpen(false);
-                        },
-                      },
-                    ].map((item) => (
-                      <div
-                        key={item.label}
-                        style={S.dropdownItem}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background =
-                            "#F6F8FA")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background =
-                            "transparent")
-                        }
-                        onClick={item.onClick}
-                      >
+                <AnimatePresence>
+                  {profileOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      style={S.profilePanel}
+                    >
+                      {/* User header */}
+                      <div style={S.profileHeader}>
                         <div
                           style={{
-                            ...S.dropdownIconBox,
-                            background: "#F6F8FA",
+                            ...S.avatarLg,
+                            background: user.avatar_color,
+                          }}
+                        >
+                          {user.username?.[0]?.toUpperCase()}
+                          <div style={S.onlineDotLg} />
+                        </div>
+                        <div>
+                          <p style={S.profileName}>{user.username}</p>
+                          <p style={S.profileEmail}>{user.email}</p>
+                        </div>
+                      </div>
+
+                      <div style={S.profileDivider} />
+
+                      {/* Profile items with animated hover */}
+                      {profileItems.map((item) => (
+                        <div
+                          key={item.id}
+                          style={{
+                            position: "relative",
+                            borderRadius: "8px",
+                            overflow: "hidden",
+                          }}
+                          onMouseEnter={() =>
+                            setHoveredItem(`profile-${item.id}`)
+                          }
+                          onMouseLeave={() => setHoveredItem(null)}
+                          onClick={item.onClick}
+                        >
+                          <AnimatePresence>
+                            {hoveredItem === `profile-${item.id}` && (
+                              <motion.div
+                                layoutId="profile-highlight"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{
+                                  type: "spring",
+                                  bounce: 0.2,
+                                  duration: 0.35,
+                                }}
+                                style={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  background: "rgba(255,255,255,0.06)",
+                                  borderRadius: "8px",
+                                  zIndex: 0,
+                                }}
+                              />
+                            )}
+                          </AnimatePresence>
+                          <div
+                            style={{
+                              ...S.profileItem,
+                              position: "relative",
+                              zIndex: 1,
+                            }}
+                          >
+                            <span
+                              style={{
+                                ...S.profileItemLabel,
+                                color:
+                                  hoveredItem === `profile-${item.id}`
+                                    ? "#FFFFFF"
+                                    : "#C9D1D9",
+                                transition: "color 0.15s",
+                              }}
+                            >
+                              {item.label}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div style={S.profileDivider} />
+
+                      {/* Sign out */}
+                      <div
+                        style={{
+                          position: "relative",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                        }}
+                        onMouseEnter={() => setHoveredItem("signout")}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        onClick={() => {
+                          logout();
+                          navigate("/login");
+                        }}
+                      >
+                        <AnimatePresence>
+                          {hoveredItem === "signout" && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                background: "rgba(247,129,102,0.1)",
+                                borderRadius: "8px",
+                                zIndex: 0,
+                              }}
+                            />
+                          )}
+                        </AnimatePresence>
+                        <div
+                          style={{
+                            ...S.profileItem,
+                            position: "relative",
+                            zIndex: 1,
                           }}
                         >
                           <span
-                            style={{ fontSize: "14px" }}
+                            style={{
+                              ...S.profileItemLabel,
+                              color:
+                                hoveredItem === "signout"
+                                  ? "#F78166"
+                                  : "#8B949E",
+                              transition: "color 0.15s",
+                            }}
                           >
-                            {item.icon}
+                            Sign out
                           </span>
                         </div>
-
-                        <p style={S.dropdownItemTitle}>
-                          {item.label}
-                        </p>
                       </div>
-                    ))}
-
-                    <div style={S.dropdownDivider} />
-
-                    <div
-                      style={S.dropdownItem}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                          "#FFF0EE")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background =
-                          "transparent")
-                      }
-                      onClick={handleLogout}
-                    >
-                      <div
-                        style={{
-                          ...S.dropdownIconBox,
-                          background: "#FFF0EE",
-                        }}
-                      >
-                        <span style={{ fontSize: "14px" }}>
-                          🚪
-                        </span>
-                      </div>
-
-                      <p
-                        style={{
-                          ...S.dropdownItemTitle,
-                          color: "#CF222E",
-                        }}
-                      >
-                        Sign out
-                      </p>
-                    </div>
-                  </div>
-                )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </>
           ) : (
             <>
-              <button
-                style={S.loginBtn}
-                onClick={() => navigate("/login")}
-              >
+              <button style={S.loginBtn} onClick={() => navigate("/login")}>
                 Log in
               </button>
-
-              <button
-                style={S.signupBtn}
-                onClick={() => navigate("/login")}
-              >
+              <button style={S.signupBtn} onClick={() => navigate("/login")}>
                 Sign up
               </button>
             </>
           )}
         </div>
-
       </div>
     </nav>
   );
@@ -466,25 +437,23 @@ export default function Navbar() {
 
 const S = {
   nav: {
-    background: "#FFFFFF",
-    borderBottom: "1px solid #D0D7DE",
+    background: "#0D1117",
+    borderBottom: "1px solid #21262D",
     position: "sticky",
     top: 0,
     zIndex: 100,
     flexShrink: 0,
+    backdropFilter: "blur(12px)",
   },
-
   inner: {
     maxWidth: "1280px",
     margin: "0 auto",
-    padding: "0 24px",
-    height: "56px",
+    padding: "0 28px",
+    height: "58px",
     display: "flex",
     alignItems: "center",
     gap: "8px",
   },
-
-  // Logo
   logo: {
     display: "flex",
     alignItems: "center",
@@ -492,189 +461,92 @@ const S = {
     flexShrink: 0,
     marginRight: "16px",
   },
-
-  logoWord1: {
-    fontSize: "20px",
-    fontWeight: "800",
-    color: "#0D1117",
+  logoBlack: {
+    fontSize: "26px",
+    fontWeight: "900",
+    color: "#FFFFFF",
     letterSpacing: "-0.5px",
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
+    lineHeight: 1,
+    fontFamily: "'Georgia', serif",
   },
-
-  logoWord2: {
-    fontSize: "20px",
-    fontWeight: "800",
-    color: "#0969DA",
+  logoPink: {
+    fontWeight: 900,
+    color: "#58A6FF",
     letterSpacing: "-0.5px",
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
+    lineHeight: 1,
+    textShadow: "0 0 20px rgba(88,166,255,0.4)",
+    fontFamily: "'Georgia', serif",
   },
 
-  navLinks: {
-    display: "flex",
-    alignItems: "center",
-    gap: "2px",
-    flex: 1,
-  },
-
-  /*
-   * Motion Primitives-style container.
-   * The background is a single element that slides
-   * between Workspace and Resources.
-   */
-  animatedNavContainer: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    gap: "2px",
-    height: "40px",
-  },
-
-  animatedNavBackground: {
-    position: "absolute",
-    left: 0,
-    top: "4px",
-    height: "32px",
-    borderRadius: "8px",
-    background: "#F6F8FA",
-    boxShadow:
-      "0 1px 3px rgba(140,149,159,0.12)",
-    transition:
-      "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s ease, opacity 0.2s ease",
-    pointerEvents: "none",
-  },
-
-  navItemWrap: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-  },
-
+  links: { display: "flex", alignItems: "center", gap: "2px", flex: 1 },
+  navItemWrap: { position: "relative" },
   navBtn: {
     background: "transparent",
     border: "none",
     cursor: "pointer",
     padding: "8px 14px",
-    borderRadius: "6px",
     fontSize: "14px",
     fontWeight: "500",
     display: "flex",
     alignItems: "center",
     gap: "4px",
     fontFamily: "inherit",
-    transition: "color 0.2s ease",
+    transition: "color 0.15s",
   },
-
-  chevron: {
-    fontSize: "10px",
-    display: "inline-block",
-    transition:
-      "transform 0.2s ease, color 0.2s ease",
-  },
-
-  // Dropdown
-  dropdown: {
+  panelWrap: {
     position: "absolute",
-    top: "calc(100% + 4px)",
+    top: "calc(100% + 10px)",
     left: 0,
-    background: "#FFFFFF",
-    border: "1px solid #D0D7DE",
-    borderRadius: "12px",
-    minWidth: "300px",
-    boxShadow:
-      "0 8px 24px rgba(140,149,159,0.25)",
     zIndex: 200,
+  },
+  panel: {
+    background: "#161B22",
+    border: "1px solid #30363D",
+    borderRadius: "12px",
+    minWidth: "280px",
+    boxShadow: "0 16px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)",
     padding: "8px",
+    overflow: "hidden",
   },
-
-  dropdownItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "10px 10px",
-    borderRadius: "8px",
+  panelItem: {
+    padding: "10px 12px",
     cursor: "pointer",
-    transition: "background 0.1s",
-    background: "transparent",
   },
-
-  dropdownIconBox: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-
-  dropdownItemTitle: {
-    color: "#0D1117",
+  panelItemTitle: {
     fontSize: "14px",
     fontWeight: "600",
     margin: 0,
+    lineHeight: 1.3,
   },
-
-  dropdownItemDesc: {
-    color: "#57606A",
+  panelItemDesc: {
     fontSize: "12px",
-    margin: "2px 0 0 0",
+    color: "#484F58",
+    margin: "3px 0 0 0",
   },
-
-  dropdownArrow: {
-    color: "#57606A",
-    fontSize: "12px",
-    marginLeft: "auto",
-    flexShrink: 0,
-  },
-
-  dropdownDivider: {
-    height: "1px",
-    background: "#D0D7DE",
-    margin: "6px 0",
-  },
-
-  // User menu
-  userHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 10px",
-  },
-
-  avatarSm: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: "13px",
-    flexShrink: 0,
-  },
-
-  userName: {
-    color: "#0D1117",
-    fontWeight: "600",
-    fontSize: "13px",
-    margin: 0,
-  },
-
-  userEmail: {
-    color: "#57606A",
-    fontSize: "11px",
-    margin: 0,
-  },
-
-  // Right
   right: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "12px",
     marginLeft: "auto",
   },
-
+  newRoomBtn: {
+    background: "#238636",
+    color: "#FFFFFF",
+    border: "1px solid #2ea043",
+    borderRadius: "6px",
+    padding: "7px 16px",
+    fontSize: "13px",
+    fontWeight: "600",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    transition: "background 0.15s",
+  },
+  avatarWrap: {
+    position: "relative",
+    cursor: "pointer",
+    width: "34px",
+    height: "34px",
+  },
   avatar: {
     width: "34px",
     height: "34px",
@@ -683,44 +555,97 @@ const S = {
     alignItems: "center",
     justifyContent: "center",
     color: "#fff",
-    fontWeight: "bold",
-    fontSize: "13px",
-    cursor: "pointer",
-    border: "2px solid #D0D7DE",
-    flexShrink: 0,
-  },
-
-  newRoomBtn: {
-    background: "#0969DA",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "7px 16px",
+    fontWeight: "700",
     fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    fontFamily: "inherit",
+    border: "2px solid #30363D",
   },
-
+  onlineDot: {
+    position: "absolute",
+    bottom: "0px",
+    right: "0px",
+    width: "9px",
+    height: "9px",
+    borderRadius: "50%",
+    background: "#3FB950",
+    border: "2px solid #0D1117",
+  },
+  profilePanel: {
+    position: "absolute",
+    top: "calc(100% + 10px)",
+    right: 0,
+    background: "#161B22",
+    border: "1px solid #30363D",
+    borderRadius: "12px",
+    minWidth: "220px",
+    boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+    padding: "8px",
+    zIndex: 300,
+    overflow: "hidden",
+  },
+  profileHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "8px 10px 12px",
+  },
+  avatarLg: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: "16px",
+    flexShrink: 0,
+    position: "relative",
+  },
+  onlineDotLg: {
+    position: "absolute",
+    bottom: "0px",
+    right: "0px",
+    width: "10px",
+    height: "10px",
+    borderRadius: "50%",
+    background: "#3FB950",
+    border: "2px solid #161B22",
+  },
+  profileName: {
+    color: "#E6EDF3",
+    fontWeight: "700",
+    fontSize: "14px",
+    margin: 0,
+  },
+  profileEmail: { color: "#484F58", fontSize: "11px", margin: "2px 0 0 0" },
+  profileDivider: { height: "1px", background: "#21262D", margin: "6px 0" },
+  profileItem: {
+    padding: "9px 12px",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+  },
+  profileItemLabel: {
+    fontSize: "13px",
+    fontWeight: "500",
+  },
   loginBtn: {
     background: "transparent",
-    color: "#0D1117",
+    color: "#8B949E",
     border: "none",
-    borderRadius: "6px",
     padding: "7px 12px",
     fontSize: "14px",
     fontWeight: "500",
     cursor: "pointer",
     fontFamily: "inherit",
   },
-
   signupBtn: {
-    background: "#0969DA",
+    background: "#238636",
     color: "#fff",
-    border: "none",
+    border: "1px solid #2ea043",
     borderRadius: "6px",
     padding: "7px 16px",
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: "600",
     cursor: "pointer",
     fontFamily: "inherit",

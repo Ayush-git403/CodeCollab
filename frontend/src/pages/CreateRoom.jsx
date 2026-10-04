@@ -8,23 +8,18 @@ export default function Admin() {
 
   const type = searchParams.get("type");
 
+  // Get mode directly from URL
   const mode =
     type === "room"
       ? "room"
       : type === "contest"
       ? "contest"
-      : type === "join"
-      ? "join"
       : null;
 
   const [name, setName] = useState("");
   const [targetOutput, setTargetOutput] = useState("");
   const [timeLimit, setTimeLimit] = useState(300);
   const [createdId, setCreatedId] = useState(null);
-
-  // JOIN ROOM
-  const [roomId, setRoomId] = useState("");
-  const [joinError, setJoinError] = useState("");
 
   // -----------------------------------------
   // BACK TO DASHBOARD + REOPEN CREATE DIALOG
@@ -34,8 +29,6 @@ export default function Admin() {
     setTargetOutput("");
     setTimeLimit(300);
     setCreatedId(null);
-    setRoomId("");
-    setJoinError("");
 
     navigate("/dashboard?createRoom=true");
   };
@@ -99,31 +92,6 @@ export default function Admin() {
     }
   };
 
-  // -----------------------------------------
-  // JOIN ROOM
-  // -----------------------------------------
-  const joinRoom = async () => {
-    if (!roomId.trim()) {
-      setJoinError("Enter a Room ID");
-      return;
-    }
-
-    try {
-      setJoinError("");
-
-      const id = roomId.trim().toUpperCase();
-
-      await axios.get(
-        `http://localhost:5000/api/room/${id}`
-      );
-
-      navigate(`/room/${id}`);
-    } catch (error) {
-      console.error(error);
-      setJoinError("Room not found — check the Room ID");
-    }
-  };
-
   // =========================================
   // NO TYPE → OLD SELECTION SCREEN
   // =========================================
@@ -182,95 +150,12 @@ export default function Admin() {
             </div>
           </div>
 
-          {/* Join Room */}
-          <div
-            style={styles.optionCard}
-            onClick={() => navigate("/admin?type=join")}
-          >
-            <span style={styles.optionIcon}>↗</span>
-
-            <div>
-              <p style={styles.optionTitle}>
-                Join Room
-              </p>
-
-              <p style={styles.optionDesc}>
-                Enter a Room ID to join an existing
-                collaborative room.
-              </p>
-            </div>
-          </div>
-
           {/* BACK TO DASHBOARD + OPEN DIALOG */}
           <button
             style={styles.backBtn}
             onClick={backToDashboard}
           >
             ← Back
-          </button>
-
-        </div>
-      </div>
-    );
-  }
-
-  // =========================================
-  // JOIN ROOM
-  // =========================================
-  if (mode === "join") {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-
-          {/* BACK */}
-          <button
-            style={styles.backBtn}
-            onClick={backToDashboard}
-          >
-            ← Back
-          </button>
-
-          <h2 style={styles.title}>
-            Join Room
-          </h2>
-
-          <p style={styles.sub}>
-            Enter the Room ID shared with you
-          </p>
-
-          <input
-            style={styles.input}
-            placeholder="Enter Room ID"
-            value={roomId}
-            onChange={(e) => {
-              setRoomId(e.target.value);
-              setJoinError("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                joinRoom();
-              }
-            }}
-            autoFocus
-          />
-
-          {joinError && (
-            <p
-              style={{
-                color: "#F85149",
-                fontSize: "13px",
-                margin: "0",
-              }}
-            >
-              {joinError}
-            </p>
-          )}
-
-          <button
-            style={styles.primaryBtn}
-            onClick={joinRoom}
-          >
-            Join Room
           </button>
 
         </div>
@@ -323,6 +208,7 @@ export default function Admin() {
             Create Room
           </button>
 
+          {/* CREATED ROOM */}
           {createdId && (
             <div style={styles.result}>
 
@@ -451,6 +337,7 @@ export default function Admin() {
             Create Contest
           </button>
 
+          {/* CREATED CONTEST */}
           {createdId && (
             <div style={styles.result}>
 
