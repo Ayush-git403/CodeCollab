@@ -48,7 +48,7 @@ export default function Navbar() {
           label: "Collaborative Rooms",
           desc: "Code together in real time with your team",
           onClick: () => {
-            navigate("/admin?type=room");
+            navigate("/create?type=room");
             setHovered(null);
           },
         },
@@ -57,7 +57,7 @@ export default function Navbar() {
           label: "Contest Mode",
           desc: "Race to match the target output",
           onClick: () => {
-            navigate("/admin?type=contest");
+            navigate("/create?type=contest");
             setHovered(null);
           },
         },
@@ -66,7 +66,7 @@ export default function Navbar() {
           label: "New Room",
           desc: "Start a fresh coding space instantly",
           onClick: () => {
-            navigate("/admin");
+            navigate("/create");
             setHovered(null);
           },
         },
@@ -105,7 +105,7 @@ export default function Navbar() {
       id: "dashboard",
       label: "Dashboard",
       onClick: () => {
-        navigate("/dashboard");
+        navigate("/app");
         setProfileOpen(false);
       },
     },
@@ -113,7 +113,7 @@ export default function Navbar() {
       id: "newroom",
       label: "New Room",
       onClick: () => {
-        navigate("/admin");
+        navigate("/create");
         setProfileOpen(false);
       },
     },
@@ -251,7 +251,7 @@ export default function Navbar() {
               <button
                 style={S.newRoomBtn}
                 onClick={() =>
-                  user ? navigate("/admin") : navigate("/login?next=admin")
+                  user ? navigate("/create") : navigate("/login?next=create")
                 }
               >
                 New Room

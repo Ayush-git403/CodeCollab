@@ -191,9 +191,9 @@ export default function Home() {
 
   const handleCreateRoom = () => {
     if (user) {
-      navigate("/admin");
+      navigate("/create");
     } else {
-      navigate("/login?next=admin");
+      navigate("/login?next=create");
     }
   };
 
