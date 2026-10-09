@@ -15,11 +15,11 @@ export default function RoomDialog({ open, onOpenChange }) {
 
   const handleRoomSelect = (type) => {
     if (type === "room") {
-      navigate("/admin?type=room");
+      navigate("/create?type=room");
     }
 
     if (type === "contest") {
-      navigate("/admin?type=contest");
+      navigate("/create?type=contest");
     }
   };
 
