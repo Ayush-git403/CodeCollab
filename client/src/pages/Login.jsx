@@ -1,11 +1,8 @@
-
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
-
-const API_URL = "https://codecollab-d0p4.onrender.com";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -18,29 +15,30 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e?.preventDefault();
+  const handleSubmit = async () => {
     setError("");
     setLoading(true);
 
     try {
-      const res = await axios.post(`${API_URL}/api/auth/login`, {
-        email: email.trim(),
-        password,
-      });
+      const res = await axios.post(
+        "https://codecollab-d0p4.onrender.com/api/auth/login",
+        {
+          email,
+          password,
+        }
+      );
 
       login(res.data.token, res.data.user);
-
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get("next") || "app";
-      navigate(`/${next}`, { replace: true });
+      navigate("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
+      console.log("STATUS:", err?.response?.status);
+      console.log("BACKEND RESPONSE:", err?.response?.data);
 
       setError(
         err?.response?.data?.error ||
           err?.response?.data?.message ||
-          "Unable to sign in. Please try again."
+          "Something went wrong"
       );
     } finally {
       setLoading(false);
@@ -52,68 +50,48 @@ export default function Login() {
       <div style={S.card}>
         {/* LOGO */}
         <div style={S.logoRow}>
-          <div style={S.logoMark}>C</div>
-
+          <span style={{ fontSize: "28px" }}>⚡</span>
           <div>
             <p style={S.logoTitle}>CodeCollab Arena</p>
             <p style={S.logoSub}>Code together. Compete. Build.</p>
           </div>
         </div>
 
-        {/* HEADING */}
-        <div>
-          <h1 style={S.heading}>Welcome back</h1>
-          <p style={S.description}>
-            Sign in to continue to CodeCollab Arena.
-          </p>
-        </div>
-
-        {/* LOGIN FORM */}
-        <form onSubmit={handleSubmit} style={S.form}>
-          {/* EMAIL */}
+        {/* FORM */}
+        <div style={S.form}>
           <div style={S.field}>
-            <label htmlFor="email" style={S.label}>
-              Email
-            </label>
-
+            <label style={S.label}>Email</label>
             <input
-              id="email"
               style={S.input}
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
               autoFocus
-              required
             />
           </div>
 
-          {/* PASSWORD */}
           <div style={S.field}>
-            <label htmlFor="password" style={S.label}>
-              Password
-            </label>
-
+            <label style={S.label}>Password</label>
             <div style={S.passwordWrapper}>
               <input
-                id="password"
                 style={S.passwordInput}
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !loading) {
+                    handleSubmit();
+                  }
+                }}
               />
 
               <button
                 type="button"
                 style={S.eyeButton}
-                onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={
-                  showPassword ? "Hide password" : "Show password"
-                }
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
                   <EyeOff size={18} />
@@ -125,15 +103,11 @@ export default function Login() {
           </div>
 
           {/* ERROR */}
-          {error && (
-            <div role="alert" style={S.error}>
-              {error}
-            </div>
-          )}
+          {error && <div style={S.error}>{error}</div>}
 
           {/* SUBMIT */}
           <button
-            type="submit"
+            type="button"
             style={{
               ...S.submitBtn,
               ...(hovered === "submit" && !loading
@@ -144,11 +118,12 @@ export default function Login() {
             }}
             onMouseEnter={() => setHovered("submit")}
             onMouseLeave={() => setHovered(null)}
+            onClick={handleSubmit}
             disabled={loading}
           >
             {loading ? "Please wait..." : "Sign In →"}
           </button>
-        </form>
+        </div>
 
         {/* OAUTH */}
         <div style={S.oauthSection}>
@@ -210,9 +185,20 @@ export default function Login() {
         {/* FOOTER */}
         <p style={S.footer}>
           Don't have an account?{" "}
-          <Link to="/signup" style={S.footerLink}>
+          <span
+            style={S.footerLink}
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate("/signup")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate("/signup");
+              }
+            }}
+          >
             Sign up
-          </Link>
+          </span>
         </p>
       </div>
     </div>
@@ -227,7 +213,6 @@ const S = {
     alignItems: "center",
     justifyContent: "center",
     padding: "20px",
-    boxSizing: "border-box",
   },
 
   card: {
@@ -239,29 +224,13 @@ const S = {
     maxWidth: "400px",
     display: "flex",
     flexDirection: "column",
-    gap: "22px",
-    boxSizing: "border-box",
+    gap: "20px",
   },
 
   logoRow: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
-  },
-
-  logoMark: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "9px",
-    background: "#FFFFFF",
-    color: "#111111",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "Georgia, serif",
-    fontSize: "24px",
-    fontWeight: "700",
-    flexShrink: 0,
   },
 
   logoTitle: {
@@ -275,33 +244,19 @@ const S = {
   logoSub: {
     color: "#8B949E",
     fontSize: "12px",
-    margin: "4px 0 0",
-  },
-
-  heading: {
-    color: "#FFFFFF",
-    fontSize: "26px",
-    fontWeight: "700",
-    margin: "0 0 8px",
-  },
-
-  description: {
-    color: "#8B949E",
-    fontSize: "14px",
     margin: 0,
-    lineHeight: 1.5,
   },
 
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "16px",
+    gap: "14px",
   },
 
   field: {
     display: "flex",
     flexDirection: "column",
-    gap: "7px",
+    gap: "6px",
   },
 
   label: {
@@ -311,13 +266,11 @@ const S = {
   },
 
   input: {
-    width: "100%",
-    boxSizing: "border-box",
     background: "#111111",
-    border: "2px solid #444444",
+    border: "2px solid #555555",
     borderRadius: "8px",
     color: "#FFFFFF",
-    padding: "11px 14px",
+    padding: "10px 14px",
     fontSize: "14px",
     outline: "none",
     fontFamily: "inherit",
@@ -333,10 +286,10 @@ const S = {
     width: "100%",
     boxSizing: "border-box",
     background: "#111111",
-    border: "2px solid #444444",
+    border: "2px solid #555555",
     borderRadius: "8px",
     color: "#FFFFFF",
-    padding: "11px 44px 11px 14px",
+    padding: "10px 44px 10px 14px",
     fontSize: "14px",
     outline: "none",
     fontFamily: "inherit",
@@ -415,7 +368,7 @@ const S = {
 
   oauthBtn: {
     width: "100%",
-    minHeight: "42px",
+    height: "42px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -454,3 +407,4 @@ const S = {
     textUnderlineOffset: "2px",
   },
 };
+```
