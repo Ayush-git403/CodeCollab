@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import UserDashboard from "./pages/UserDashboard";
 import Room from "./pages/Room";
 import CreateRoom from "./pages/CreateRoom";
@@ -15,7 +16,7 @@ export default function App() {
           {/* Public pages */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
           {/* Protected pages */}
           <Route

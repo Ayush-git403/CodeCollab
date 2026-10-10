@@ -1,14 +1,14 @@
+
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
 
+const API_URL = "https://codecollab-d0p4.onrender.com";
+
 export default function Login() {
-  const location = useLocation();
-  const isSignup = location.pathname === "/signup";
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -18,51 +18,29 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      // =========================
-      // SIGN UP
-      // =========================
-      if (isSignup) {
-        const res = await axios.post("https://codecollab-d0p4.onrender.com/api/auth/signup", {
-          username,
-          email,
-          password,
-        });
+      const res = await axios.post(`${API_URL}/api/auth/login`, {
+        email: email.trim(),
+        password,
+      });
 
-        login(res.data.token, res.data.user);
+      login(res.data.token, res.data.user);
 
-        const params = new URLSearchParams(window.location.search);
-        const next = params.get("next") || "app";
-        navigate(`/${next}`);
-      }
-
-      // =========================
-      // LOGIN
-      // =========================
-      else {
-        const res = await axios.post("https://codecollab-d0p4.onrender.com/api/auth/login", {
-          email,
-          password,
-        });
-
-        login(res.data.token, res.data.user);
-
-        navigate("/dashboard");
-      }
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") || "app";
+      navigate(`/${next}`, { replace: true });
     } catch (err) {
-      console.error("Login/Signup error:", err);
-
-      console.log("STATUS:", err?.response?.status);
-      console.log("BACKEND RESPONSE:", err?.response?.data);
+      console.error("Login error:", err);
 
       setError(
         err?.response?.data?.error ||
           err?.response?.data?.message ||
-          "Something went wrong",
+          "Unable to sign in. Please try again."
       );
     } finally {
       setLoading(false);
@@ -72,110 +50,107 @@ export default function Login() {
   return (
     <div style={S.page}>
       <div style={S.card}>
-        {/* =========================
-            LOGO
-        ========================= */}
+        {/* LOGO */}
         <div style={S.logoRow}>
-          <span style={{ fontSize: "28px" }}>⚡</span>
+          <div style={S.logoMark}>C</div>
 
           <div>
             <p style={S.logoTitle}>CodeCollab Arena</p>
-
             <p style={S.logoSub}>Code together. Compete. Build.</p>
           </div>
         </div>
 
-        {/* =========================
-            FORM
-        ========================= */}
-        <div style={S.form}>
-          {/* USERNAME - SIGNUP ONLY */}
-          {isSignup && (
-            <div style={S.field}>
-              <label style={S.label}>Username</label>
+        {/* HEADING */}
+        <div>
+          <h1 style={S.heading}>Welcome back</h1>
+          <p style={S.description}>
+            Sign in to continue to CodeCollab Arena.
+          </p>
+        </div>
 
-              <input
-                style={S.input}
-                type="text"
-                placeholder="yourname"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoFocus
-              />
-            </div>
-          )}
-
+        {/* LOGIN FORM */}
+        <form onSubmit={handleSubmit} style={S.form}>
           {/* EMAIL */}
           <div style={S.field}>
-            <label style={S.label}>Email</label>
+            <label htmlFor="email" style={S.label}>
+              Email
+            </label>
 
             <input
+              id="email"
               style={S.input}
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoFocus={!isSignup}
+              autoComplete="email"
+              autoFocus
+              required
             />
           </div>
 
           {/* PASSWORD */}
           <div style={S.field}>
-            <label style={S.label}>Password</label>
+            <label htmlFor="password" style={S.label}>
+              Password
+            </label>
 
             <div style={S.passwordWrapper}>
               <input
+                id="password"
                 style={S.passwordInput}
                 type={showPassword ? "text" : "password"}
-                placeholder={isSignup ? "Min 6 characters" : "••••••••"}
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !loading) {
-                    handleSubmit();
-                  }
-                }}
+                autoComplete="current-password"
+                required
               />
 
               <button
                 type="button"
                 style={S.eyeButton}
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={
+                  showPassword ? "Hide password" : "Show password"
+                }
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? (
+                  <EyeOff size={18} />
+                ) : (
+                  <Eye size={18} />
+                )}
               </button>
             </div>
           </div>
 
           {/* ERROR */}
-          {error && <div style={S.error}>{error}</div>}
+          {error && (
+            <div role="alert" style={S.error}>
+              {error}
+            </div>
+          )}
 
           {/* SUBMIT */}
           <button
-            type="button"
+            type="submit"
             style={{
               ...S.submitBtn,
-              ...(hovered === "submit" && !loading ? S.submitBtnHover : {}),
+              ...(hovered === "submit" && !loading
+                ? S.submitBtnHover
+                : {}),
               opacity: loading ? 0.6 : 1,
               cursor: loading ? "not-allowed" : "pointer",
             }}
             onMouseEnter={() => setHovered("submit")}
             onMouseLeave={() => setHovered(null)}
-            onClick={handleSubmit}
             disabled={loading}
           >
-            {loading
-              ? "Please wait..."
-              : isSignup
-                ? "Create Account →"
-                : "Sign In →"}
+            {loading ? "Please wait..." : "Sign In →"}
           </button>
-        </div>
+        </form>
 
-        {/* =========================
-            OAUTH
-        ========================= */}
+        {/* OAUTH */}
         <div style={S.oauthSection}>
           <div style={S.oauthDivider}>
             <span style={S.dividerLine} />
@@ -232,32 +207,12 @@ export default function Login() {
           </button>
         </div>
 
-        {/* =========================
-            FOOTER
-        ========================= */}
+        {/* FOOTER */}
         <p style={S.footer}>
-          {isSignup ? "Already have an account? " : "Don't have an account? "}
-
-          <span
-            style={S.footerLink}
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setError("");
-              setShowPassword(false);
-              navigate(isSignup ? "/login" : "/signup");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                setError("");
-                setShowPassword(false);
-                navigate(isSignup ? "/login" : "/signup");
-              }
-            }}
-          >
-            {isSignup ? "Sign in" : "Sign up"}
-          </span>
+          Don't have an account?{" "}
+          <Link to="/signup" style={S.footerLink}>
+            Sign up
+          </Link>
         </p>
       </div>
     </div>
@@ -265,9 +220,6 @@ export default function Login() {
 }
 
 const S = {
-  // =========================
-  // PAGE
-  // =========================
   page: {
     minHeight: "100vh",
     background: "#000000",
@@ -275,11 +227,9 @@ const S = {
     alignItems: "center",
     justifyContent: "center",
     padding: "20px",
+    boxSizing: "border-box",
   },
 
-  // =========================
-  // CARD
-  // =========================
   card: {
     background: "#191919",
     border: "1px solid #2D2D2D",
@@ -289,16 +239,29 @@ const S = {
     maxWidth: "400px",
     display: "flex",
     flexDirection: "column",
-    gap: "20px",
+    gap: "22px",
+    boxSizing: "border-box",
   },
 
-  // =========================
-  // LOGO
-  // =========================
   logoRow: {
     display: "flex",
     alignItems: "center",
     gap: "12px",
+  },
+
+  logoMark: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "9px",
+    background: "#FFFFFF",
+    color: "#111111",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "Georgia, serif",
+    fontSize: "24px",
+    fontWeight: "700",
+    flexShrink: 0,
   },
 
   logoTitle: {
@@ -312,22 +275,33 @@ const S = {
   logoSub: {
     color: "#8B949E",
     fontSize: "12px",
-    margin: 0,
+    margin: "4px 0 0",
   },
 
-  // =========================
-  // FORM
-  // =========================
+  heading: {
+    color: "#FFFFFF",
+    fontSize: "26px",
+    fontWeight: "700",
+    margin: "0 0 8px",
+  },
+
+  description: {
+    color: "#8B949E",
+    fontSize: "14px",
+    margin: 0,
+    lineHeight: 1.5,
+  },
+
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: "14px",
+    gap: "16px",
   },
 
   field: {
     display: "flex",
     flexDirection: "column",
-    gap: "6px",
+    gap: "7px",
   },
 
   label: {
@@ -337,20 +311,19 @@ const S = {
   },
 
   input: {
+    width: "100%",
+    boxSizing: "border-box",
     background: "#111111",
-    border: "2px solid #555555",
+    border: "2px solid #444444",
     borderRadius: "8px",
     color: "#FFFFFF",
-    padding: "10px 14px",
+    padding: "11px 14px",
     fontSize: "14px",
     outline: "none",
     fontFamily: "inherit",
     transition: "border-color 0.15s",
   },
 
-  // =========================
-  // PASSWORD
-  // =========================
   passwordWrapper: {
     position: "relative",
     width: "100%",
@@ -360,19 +333,16 @@ const S = {
     width: "100%",
     boxSizing: "border-box",
     background: "#111111",
-    border: "2px solid #555555",
+    border: "2px solid #444444",
     borderRadius: "8px",
     color: "#FFFFFF",
-    padding: "10px 44px 10px 14px",
+    padding: "11px 44px 11px 14px",
     fontSize: "14px",
     outline: "none",
     fontFamily: "inherit",
     transition: "border-color 0.15s",
   },
 
-  // =========================
-  // EYE BUTTON
-  // =========================
   eyeButton: {
     position: "absolute",
     right: "10px",
@@ -388,9 +358,6 @@ const S = {
     justifyContent: "center",
   },
 
-  // =========================
-  // ERROR
-  // =========================
   error: {
     background: "rgba(247,129,102,0.1)",
     border: "1px solid #F78166",
@@ -400,9 +367,6 @@ const S = {
     fontSize: "13px",
   },
 
-  // =========================
-  // SUBMIT
-  // =========================
   submitBtn: {
     background: "#FFFFFF",
     color: "#111111",
@@ -422,9 +386,6 @@ const S = {
     transform: "translateY(-1px)",
   },
 
-  // =========================
-  // OAUTH
-  // =========================
   oauthSection: {
     display: "flex",
     flexDirection: "column",
@@ -454,7 +415,7 @@ const S = {
 
   oauthBtn: {
     width: "100%",
-    height: "42px",
+    minHeight: "42px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -479,9 +440,6 @@ const S = {
     flexShrink: 0,
   },
 
-  // =========================
-  // FOOTER
-  // =========================
   footer: {
     color: "#8B949E",
     fontSize: "13px",
