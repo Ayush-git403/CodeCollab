@@ -19,7 +19,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://codecollab.vercel.app",
+      "https://code-collab-seven-lake.vercel.app",
     ],
     methods: ["GET", "POST"],
   },
@@ -29,7 +29,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://codecollab.vercel.app",
+      "https://code-collab-seven-lake.vercel.app",
       // add your actual Vercel URL here after deployment
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
