@@ -12,14 +12,14 @@ export default function AIPanel({ code, language, targetOutput }) {
     try {
       let res;
       if (type === "explain") {
-        res = await axios.post("http://localhost:5000/api/ai/explain", { code, language });
+        res = await axios.post("https://codecollab-d0p4.onrender.com/api/ai/explain", { code, language });
         setResponse(res.data.explanation);
       } else if (type === "hint") {
-        res = await axios.post("http://localhost:5000/api/ai/hint", { userCode: code, targetOutput, language });
+        res = await axios.post("https://codecollab-d0p4.onrender.com/api/ai/hint", { userCode: code, targetOutput, language });
         setResponse(res.data.hint);
       } else if (type === "memory") {
         const userId = localStorage.getItem("userId");
-        res = await axios.post("http://localhost:5000/api/ai/memory", { userId, currentCode: code, question });
+        res = await axios.post("https://codecollab-d0p4.onrender.com/api/ai/memory", { userId, currentCode: code, question });
         setResponse(res.data.response);
       }
     } catch (e) {

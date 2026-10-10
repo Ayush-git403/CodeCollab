@@ -116,7 +116,7 @@ export default function Room() {
   // Load room
   useEffect(() => {
     axios
-      .get(`http://localhost:5000/api/room/${roomId}`)
+      .get(`https://codecollab-d0p4.onrender.com/api/room/${roomId}`)
       .then((res) => setRoom(res.data))
       .catch(() => alert("Room not found"));
   }, [roomId]);
@@ -300,7 +300,7 @@ export default function Room() {
       const content = editorRef.current.getValue();
       fileContentCache.current[file.name] = content;
       try {
-        await axios.post("http://localhost:5000/api/room/save", {
+        await axios.post("https://codecollab-d0p4.onrender.com/api/room/save", {
           roomId,
           filename: file.name,
           language: file.language,
@@ -448,7 +448,7 @@ export default function Room() {
     setOutput("");
     try {
       const code = editorRef.current.getValue();
-      const res = await axios.post("http://localhost:5000/api/execute/run", {
+      const res = await axios.post("https://codecollab-d0p4.onrender.com/api/execute/run", {
         code,
         language: activeFile.language,
         roomId,
@@ -467,7 +467,7 @@ export default function Room() {
     const content = editorRef.current.getValue();
     fileContentCache.current[activeFile.name] = content;
     try {
-      await axios.post("http://localhost:5000/api/room/save", {
+      await axios.post("https://codecollab-d0p4.onrender.com/api/room/save", {
         roomId,
         filename: activeFile.name,
         language: activeFile.language,

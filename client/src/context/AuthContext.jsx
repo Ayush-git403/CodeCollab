@@ -16,7 +16,7 @@ export function AuthProvider({ children }) {
     }
 
     axios
-      .get("http://localhost:5000/api/auth/me", {
+      .get("https://codecollab-d0p4.onrender.com/api/auth/me", {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setUser(res.data.user))

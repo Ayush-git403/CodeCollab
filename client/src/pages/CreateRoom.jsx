@@ -31,7 +31,7 @@ export default function CreateRoom() {
     setLoading(true); setError("");
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/room/create",
+        "https://codecollab-d0p4.onrender.com/api/room/create",
         { name, language: "javascript", targetOutput: "", timeLimit: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -49,7 +49,7 @@ export default function CreateRoom() {
     setLoading(true); setError("");
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/room/create",
+        "https://codecollab-d0p4.onrender.com/api/room/create",
         { name, language: "javascript", targetOutput, timeLimit: Number(timeLimit) },
         { headers: { Authorization: `Bearer ${token}` } }
       );

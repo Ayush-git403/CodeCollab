@@ -4,7 +4,7 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://codecollab-d0p4.onrender.com/api";
 
 export default function UserSpace() {
   const { user } = useAuth();

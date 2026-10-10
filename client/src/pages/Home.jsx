@@ -377,7 +377,7 @@ export default function Home() {
 
     try {
 
-      await axios.get(`http://localhost:5000/api/room/${id}`);
+      await axios.get(`https://codecollab-d0p4.onrender.com/api/room/${id}`);
 
       navigate(`/room/${id}`);
 

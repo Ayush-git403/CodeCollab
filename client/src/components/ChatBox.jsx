@@ -39,7 +39,7 @@ export default function ChatBox({ roomId, username }) {
     initialLoadDone.current = true;
 
     setLoading(true);
-    axios.get(`http://localhost:5000/api/chat/${roomId}?limit=50`)
+    axios.get(`https://codecollab-d0p4.onrender.com/api/chat/${roomId}?limit=50`)
       .then((res) => {
         const { messages: msgs, hasMore: more } = res.data;
         setMessages(msgs.map(normalize));
@@ -90,7 +90,7 @@ export default function ChatBox({ roomId, username }) {
 
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/chat/${roomId}?before=${encodeURIComponent(oldestTimestamp.current)}&limit=50`
+        `https://codecollab-d0p4.onrender.com/api/chat/${roomId}?before=${encodeURIComponent(oldestTimestamp.current)}&limit=50`
       );
       const { messages: older, hasMore: more } = res.data;
 
