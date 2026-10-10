@@ -424,7 +424,7 @@ export default function Navbar() {
               <button style={S.loginBtn} onClick={() => navigate("/login")}>
                 Log in
               </button>
-              <button style={S.signupBtn} onClick={() => navigate("/login")}>
+              <button style={S.signupBtn} onClick={() => navigate("/signup")}>
                 Sign up
               </button>
             </>
