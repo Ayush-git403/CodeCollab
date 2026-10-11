@@ -11,7 +11,11 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    new URLSearchParams(window.location.search).get("error") === "oauth"
+      ? "Social sign-in failed. Please try again."
+      : "",
+  );
   const [loading, setLoading] = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -150,7 +154,12 @@ export default function Signup() {
             <span style={S.dividerLine} />
           </div>
 
-          <button type="button" style={S.oauthBtn} aria-label="Continue with Google">
+          <button
+            type="button"
+            style={S.oauthBtn}
+            aria-label="Continue with Google"
+            onClick={() => (window.location.href = `${API_URL}/api/auth/google`)}
+          >
             <span style={S.oauthIcon} aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M21.35 12.27c0-.79-.07-1.55-.22-2.27H12v4.3h5.22a4.46 4.46 0 0 1-1.94 2.93v2.43h3.14c1.84-1.69 2.93-4.18 2.93-7.39Z" />
@@ -162,7 +171,12 @@ export default function Signup() {
             <span>Continue with Google</span>
           </button>
 
-          <button type="button" style={S.oauthBtn} aria-label="Continue with GitHub">
+          <button
+            type="button"
+            style={S.oauthBtn}
+            aria-label="Continue with GitHub"
+            onClick={() => (window.location.href = `${API_URL}/api/auth/github`)}
+          >
             <span style={S.oauthIcon} aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.24c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.2.09 1.83 1.23 1.83 1.23 1.07 1.83 2.81 1.3 3.5.99.11-.77.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.23-3.22-.12-.3-.53-1.52.12-3.18 0 0 1-.32 3.3 1.23A11.45 11.45 0 0 1 12 6.02c1.02 0 2.05.14 3.01.42 2.3-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.76.84 1.23 1.91 1.23 3.22 0 4.62-2.81 5.64-5.49 5.94.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z" />

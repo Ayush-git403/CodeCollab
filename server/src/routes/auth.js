@@ -53,6 +53,11 @@ router.post("/signup", async (req, res) => {
     );
 
     const user = result.rows[0];
+    if (!user.password_hash) {
+      return res
+        .status(400)
+        .json({ error: "This account uses Google or GitHub sign-in." });
+    }
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       JWT_SECRET,

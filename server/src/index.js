@@ -48,6 +48,7 @@ app.use((req, res, next) => {
 app.use("/api/room", roomRoutes);
 app.use("/api/execute", executeRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/auth", require("./routes/oauth"));
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 
