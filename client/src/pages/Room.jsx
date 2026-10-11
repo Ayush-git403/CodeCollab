@@ -537,11 +537,6 @@ export default function Room() {
               <span>{u.username}</span>
             </div>
           ))}
-          {/* Show logged-in username */}
-          <div style={{ ...styles.userChip, borderColor: "#58A6FF" }}>
-            <div style={{ ...styles.userDot, background: userColor }} />
-            <span style={{ color: "#58A6FF" }}>{username}</span>
-          </div>
         </div>
       </div>
 
