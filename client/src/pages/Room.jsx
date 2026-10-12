@@ -102,20 +102,21 @@ export default function Room() {
   const sidebar = useResize(220, 140, 480, "horizontal");
   const rightPanel = useResize(240, 160, 440, "horizontal");
   const termPanel = useResize(240, 100, 500, "vertical");
+  const { wc, status: nodeStatus, bootTerminal, teardown } = useWebContainer();
 
   useEffect(() => {
     activeFileRef.current = activeFile;
   }, [activeFile]);
+
   useEffect(() => {
     previewRef.current = preview;
   }, [preview]);
+  
   useEffect(() => {
     return () => {
       teardown();
     };
   }, [teardown]);
-
-  const { wc, status: nodeStatus, bootTerminal, teardown } = useWebContainer();
 
   useEffect(() => {
     axios
