@@ -6,8 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Terminal2  –  VS Code-style integrated terminal powered by WebContainer's
-//              built-in jsh shell.  Replaces the old character-by-character
-//              key handler that could never run real commands.
+//              built-in jsh shell.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Terminal2({ webcontainer }) {
   const terminalRef = useRef(null); // DOM node xterm renders into
@@ -75,7 +74,7 @@ export default function Terminal2({ webcontainer }) {
       });
     });
 
-    // ── ResizeObserver keeps cols/rows in sync when panel is dragged ──
+    // ResizeObserver keeps cols/rows in sync when the panel is dragged
     const ro = new ResizeObserver(() => {
       try {
         fit.fit();
@@ -102,27 +101,22 @@ export default function Terminal2({ webcontainer }) {
     // Wait until both the terminal DOM and the WebContainer are ready
     if (!webcontainer || !term) return;
 
-    // BUG FIX: old code set writerRef = true and never cleared it properly,
-    // so switching webcontainer instances would never reconnect.
-    // We use connectedRef keyed to the wc instance instead.
     if (connectedRef.current) return;
     connectedRef.current = true;
 
     let cancelled = false;
+    let shell = null; // local copy so cleanup can always kill it
     let inputWriter = null;
     let dataDisposable = null;
+    let resizeDisposable = null; // so the resize listener can be removed
 
     setStatus("booting");
     term.writeln("\x1b[2m  Waiting for shell…\x1b[0m");
 
     const connect = async () => {
       try {
-        // ── Spawn WebContainer's built-in jsh shell ──────────────────────────
-        // This is the KEY fix: instead of manually handling every command with
-        // webcontainer.spawn(), we start a real interactive shell and pipe
-        // xterm's I/O directly into it.  Every command (npm, node, ls, git…)
-        // just works because jsh handles it natively inside the container.
-        const shell = await webcontainer.spawn("jsh", {
+        // Spawn WebContainer's built-in jsh shell and pipe xterm I/O into it
+        shell = await webcontainer.spawn("jsh", {
           terminal: {
             cols: term.cols,
             rows: term.rows,
@@ -146,16 +140,16 @@ export default function Terminal2({ webcontainer }) {
         );
 
         // xterm keystrokes → shell stdin
-        const writer = shell.input.getWriter();
-        inputWriter = writer;
-        inputRef.current = writer;
+        inputWriter = shell.input.getWriter();
+        inputRef.current = inputWriter;
 
         dataDisposable = term.onData((data) => {
-          if (!cancelled) writer.write(data);
+          if (!cancelled) inputWriter.write(data);
         });
 
-        // Keep terminal size in sync with shell PTY
-        term.onResize(({ cols, rows }) => {
+        // Sync size once now, then on every resize
+        shell.resize({ cols: term.cols, rows: term.rows });
+        resizeDisposable = term.onResize(({ cols, rows }) => {
           shell.resize({ cols, rows });
         });
 
@@ -185,21 +179,15 @@ export default function Terminal2({ webcontainer }) {
     return () => {
       cancelled = true;
       dataDisposable?.dispose();
-
-      if (shellRef.current) {
-        try {
-          shellRef.current.kill();
-        } catch {}
-        shellRef.current = null;
-      }
-
-      if (inputWriter) {
-        try {
-          inputWriter.releaseLock();
-        } catch {}
-        inputRef.current = null;
-      }
-
+      resizeDisposable?.dispose();
+      try {
+        shell?.kill();
+      } catch {}
+      try {
+        inputWriter?.releaseLock();
+      } catch {}
+      shellRef.current = null;
+      inputRef.current = null;
       connectedRef.current = false;
     };
   }, [webcontainer]);
@@ -219,7 +207,6 @@ export default function Terminal2({ webcontainer }) {
       {/* ── VS Code-style terminal tab bar ── */}
       <div style={styles.tabBar}>
         <div style={styles.tabLeft}>
-          {/* Active "tab" mimics VS Code's terminal panel tab */}
           <div style={styles.activeTab}>
             <div style={{ ...styles.dot, background: dotColor }} />
             <span style={styles.tabLabel}>bash</span>
@@ -234,7 +221,7 @@ export default function Terminal2({ webcontainer }) {
             {status === "idle" && "Not connected"}
           </span>
 
-          {/* "+" new terminal button (wired up — calls bootTerminal externally) */}
+          {/* "+" new terminal button (not wired up yet) */}
           <button
             style={styles.iconBtn}
             title="New terminal"
@@ -245,7 +232,7 @@ export default function Terminal2({ webcontainer }) {
             ＋
           </button>
 
-          {/* Maximise / minimise glyph (cosmetic only — wire up via prop) */}
+          {/* Maximise / minimise glyph (cosmetic only) */}
           <button style={styles.iconBtn} title="Maximise panel">
             ⬡
           </button>
@@ -259,20 +246,20 @@ export default function Terminal2({ webcontainer }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Styles — matches VS Code's integrated terminal panel exactly
+// Styles — matches VS Code's integrated terminal panel
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = {
   wrapper: {
     display: "flex",
     flexDirection: "column",
+    textAlign: "left", // stops global text-align: center from centering output
     background: "#1e1e1e",
-    height: "100%", // keep this
+    height: "100%",
     minHeight: "0",
     overflow: "hidden",
     borderTop: "1px solid #252526",
   },
 
-  // The narrow strip at the top that holds tab labels (like VS Code)
   tabBar: {
     display: "flex",
     alignItems: "center",
@@ -291,7 +278,6 @@ const styles = {
     height: "100%",
   },
 
-  // The selected terminal tab — has the top-border accent like VS Code
   activeTab: {
     display: "flex",
     alignItems: "center",
@@ -344,12 +330,11 @@ const styles = {
     opacity: 0.7,
   },
 
-  // The actual xterm.js render target — fills remaining space
+  // The xterm.js render target — flex fills the remaining space
   xterm: {
     flex: 1,
     minHeight: "0",
     padding: "4px 8px 4px 4px",
     overflow: "hidden",
-    // Remove height: "100%" — let flex do the sizing instead
   },
 };
