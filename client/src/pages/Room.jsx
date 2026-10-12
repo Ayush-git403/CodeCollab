@@ -51,6 +51,23 @@ function buildPreviewHtml(htmlContent, fileCache) {
   return html;
 }
 
+// Guess a Monaco language from a file name (used when importing from the terminal)
+function langFromName(name) {
+  const ext = name.split(".").pop();
+  return (
+    {
+      js: "javascript",
+      jsx: "javascript",
+      ts: "typescript",
+      tsx: "typescript",
+      json: "json",
+      html: "html",
+      css: "css",
+      md: "markdown",
+    }[ext] || "plaintext"
+  );
+}
+
 function ResizeHandle({ onMouseDown, direction = "vertical" }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -98,28 +115,33 @@ export default function Room() {
   const fileContentCache = useRef({});
   const isRemoteUpdate = useRef(false);
   const previewRef = useRef(false);
-  const syncTimers = useRef({});
+  const syncTimers = useRef({}); // debounce timers for editor → container sync
+  const pulledRef = useRef(new Set()); // files imported from the terminal
+
+  // Panel resizing. `true` = drag left/up to make the panel bigger.
   const sidebar = useResize(220, 140, 480, "horizontal");
-  const rightPanel = useResize(240, 160, 440, "horizontal");
-  const termPanel = useResize(240, 100, 500, "vertical");
+  const rightPanel = useResize(240, 160, 440, "horizontal", true);
+  const termPanel = useResize(240, 100, 800, "vertical", true);
+
+  // Must stay above every effect that uses these values
   const {
     wc,
+    previewUrl,
     bootTerminal,
     teardown,
     syncFile,
     syncMkdir,
     syncRemove,
     syncRename,
+    scanFiles,
   } = useWebContainer();
 
   useEffect(() => {
     activeFileRef.current = activeFile;
   }, [activeFile]);
-
   useEffect(() => {
     previewRef.current = preview;
   }, [preview]);
-
   useEffect(() => {
     return () => {
       teardown();
@@ -220,8 +242,12 @@ export default function Room() {
     });
 
     socket.on("file_created", ({ file, message }) => {
-      fileContentCache.current[file.name] = "";
-      syncFile(file.name, "");
+      // Files imported from the terminal already have content; don't blank them
+      const fromTerminal = pulledRef.current.delete(file.name);
+      if (!fromTerminal) {
+        fileContentCache.current[file.name] = "";
+        syncFile(file.name, "");
+      }
       setFiles((prev) =>
         prev.find((f) => f.name === file.name) ? prev : [...prev, file],
       );
@@ -345,11 +371,14 @@ export default function Room() {
       if (!file) return;
       const content = editor.getValue();
       fileContentCache.current[file.name] = content;
+
+      // Copy the edit into the terminal's container (debounced)
       clearTimeout(syncTimers.current[file.name]);
       syncTimers.current[file.name] = setTimeout(
         () => syncFile(file.name, content),
         400,
       );
+
       socket.emit("code_change", { roomId, filename: file.name, content });
       if (previewRef.current) {
         const htmlFile = Object.keys(fileContentCache.current).find((n) =>
@@ -514,6 +543,50 @@ export default function Room() {
     }
     setTerminalOpen(true);
     await bootTerminal(fileContentCache.current, files);
+  };
+
+  // Import folders/files created from the terminal (npm create, mkdir, touch)
+  // into the explorer and share them with the room.
+  const pullFromTerminal = async () => {
+    const { folders, files: found } = await scanFiles();
+    const known = new Set(files.map((f) => f.name));
+    const newFolders = folders.filter((n) => !known.has(n));
+    const newFiles = found.filter((f) => !known.has(f.name));
+
+    newFolders.forEach((folderName) =>
+      socket.emit("create_folder", { roomId, folderName, username }),
+    );
+    newFiles.forEach((f) => {
+      pulledRef.current.add(f.name);
+      fileContentCache.current[f.name] = f.content;
+      socket.emit("create_file", { roomId, filename: f.name, username });
+    });
+
+    // Give the server a moment to create the entries, then store the content
+    setTimeout(() => {
+      newFiles.forEach((f) => {
+        socket.emit("code_change", {
+          roomId,
+          filename: f.name,
+          content: f.content,
+        });
+        axios
+          .post("https://codecollab-d0p4.onrender.com/api/room/save", {
+            roomId,
+            filename: f.name,
+            language: langFromName(f.name),
+            content: f.content,
+            savedBy: username,
+          })
+          .catch(() => {});
+      });
+    }, 600);
+
+    addToast(
+      newFiles.length || newFolders.length
+        ? `Imported ${newFolders.length} folders, ${newFiles.length} files`
+        : "Nothing new to import",
+    );
   };
 
   if (!room) return <div style={styles.loading}>Loading room...</div>;
@@ -689,6 +762,24 @@ export default function Room() {
                     {running ? "⏳ Running..." : "▶ Run"}
                   </button>
                 )}
+                {terminalOpen && (
+                  <button
+                    style={styles.iconBtn}
+                    onClick={pullFromTerminal}
+                    title="Import files created in the terminal"
+                  >
+                    ⟳ Import
+                  </button>
+                )}
+                {previewUrl && (
+                  <button
+                    style={styles.previewBtn}
+                    onClick={() => window.open(previewUrl, "_blank")}
+                    title="Open the running dev server"
+                  >
+                    🌐 Open app
+                  </button>
+                )}
                 <button
                   style={{
                     ...styles.runBtn,
@@ -711,28 +802,29 @@ export default function Room() {
                 sandbox="allow-scripts"
               />
             ) : (
-              <MonacoEditor
-                height={
-                  terminalOpen ? "calc(100vh - 390px)" : "calc(100vh - 130px)"
-                }
-                language={activeFile?.language || "plaintext"}
-                theme="vs-dark"
-                onMount={handleEditorMount}
-                options={{
-                  fontSize: 14,
-                  minimap: { enabled: true },
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  wordWrap: "on",
-                  cursorBlinking: "smooth",
-                  lineNumbers: "on",
-                  renderLineHighlight: "all",
-                  bracketPairColorization: { enabled: true },
-                  formatOnPaste: true,
-                  tabSize: 2,
-                  fontFamily: "Fira Code, Consolas, monospace",
-                }}
-              />
+              // The editor takes whatever space the terminal doesn't use
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <MonacoEditor
+                  height="100%"
+                  language={activeFile?.language || "plaintext"}
+                  theme="vs-dark"
+                  onMount={handleEditorMount}
+                  options={{
+                    fontSize: 14,
+                    minimap: { enabled: true },
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    wordWrap: "on",
+                    cursorBlinking: "smooth",
+                    lineNumbers: "on",
+                    renderLineHighlight: "all",
+                    bracketPairColorization: { enabled: true },
+                    formatOnPaste: true,
+                    tabSize: 2,
+                    fontFamily: "Fira Code, Consolas, monospace",
+                  }}
+                />
+              </div>
             ))}
 
           {output && <Terminal output={output} matched={null} />}

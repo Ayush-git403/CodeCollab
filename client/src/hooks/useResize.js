@@ -1,39 +1,72 @@
 import { useRef, useCallback } from "react";
 
-export default function useResize(initialSize, min, max, direction = "horizontal") {
-  const sizeRef  = useRef(initialSize);
-  const frameRef = useRef(null);
+// useResize(initialSize, min, max, direction, reverse)
+//
+//  direction "horizontal" → resizes width,  "vertical" → resizes height
+//  reverse   false → dragging right/down makes the panel bigger (left/top panels)
+//            true  → dragging left/up makes the panel bigger (right/bottom panels)
+//
+// frameRef is a callback ref, so when a panel unmounts and mounts again
+// (e.g. the terminal closing and reopening) it comes back at its last size.
+export default function useResize(
+  initialSize,
+  min,
+  max,
+  direction = "horizontal",
+  reverse = false,
+) {
+  const sizeRef = useRef(initialSize);
+  const nodeRef = useRef(null);
 
-  const startResize = useCallback((e) => {
-    e.preventDefault();
-    const startPos  = direction === "horizontal" ? e.clientX : e.clientY;
-    const startSize = sizeRef.current;
+  const apply = useCallback(
+    (size) => {
+      const node = nodeRef.current;
+      if (!node) return;
+      if (direction === "horizontal") node.style.width = `${size}px`;
+      else node.style.height = `${size}px`;
+    },
+    [direction],
+  );
 
-    const onMove = (moveEvent) => {
-      const delta = direction === "horizontal"
-        ? moveEvent.clientX - startPos
-        : moveEvent.clientY - startPos;
+  const frameRef = useCallback(
+    (node) => {
+      nodeRef.current = node;
+      if (node) apply(sizeRef.current);
+    },
+    [apply],
+  );
 
-      const newSize = Math.min(Math.max(startSize + delta, min), max);
-      sizeRef.current = newSize;
+  const startResize = useCallback(
+    (e) => {
+      e.preventDefault();
+      const startPos = direction === "horizontal" ? e.clientX : e.clientY;
+      const startSize = sizeRef.current;
 
-      if (frameRef.current) {
-        if (direction === "horizontal") {
-          frameRef.current.style.width = `${newSize}px`;
-        } else {
-          frameRef.current.style.height = `${newSize}px`;
-        }
-      }
-    };
+      document.body.style.userSelect = "none";
+      document.body.style.cursor =
+        direction === "horizontal" ? "col-resize" : "row-resize";
 
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup",   onUp);
-    };
+      const onMove = (moveEvent) => {
+        const pos =
+          direction === "horizontal" ? moveEvent.clientX : moveEvent.clientY;
+        const delta = reverse ? startPos - pos : pos - startPos;
+        const newSize = Math.min(Math.max(startSize + delta, min), max);
+        sizeRef.current = newSize;
+        apply(newSize);
+      };
 
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup",   onUp);
-  }, [direction, min, max]);
+      const onUp = () => {
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [direction, reverse, min, max, apply],
+  );
 
   return { frameRef, startResize };
 }
