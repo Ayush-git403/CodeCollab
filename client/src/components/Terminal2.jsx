@@ -62,6 +62,31 @@ export default function Terminal2({ webcontainer }) {
     term.open(terminalRef.current);
     term.focus();
 
+    // Copy / paste, like VS Code's terminal:
+    //  - Ctrl+C copies when text is selected, otherwise it still sends ^C
+    //  - Ctrl+V or Ctrl+Shift+V pastes from the clipboard
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown") return true;
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+
+      if (mod && key === "c" && term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection()).catch(() => {});
+        return false;
+      }
+
+      if (mod && key === "v") {
+        e.preventDefault();
+        navigator.clipboard
+          .readText()
+          .then((text) => term.paste(text))
+          .catch(() => {});
+        return false;
+      }
+
+      return true;
+    });
+
     xtermRef.current = term;
     fitRef.current = fit;
 
