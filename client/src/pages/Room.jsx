@@ -109,8 +109,13 @@ export default function Room() {
   useEffect(() => {
     previewRef.current = preview;
   }, [preview]);
+  useEffect(() => {
+    return () => {
+      teardown();
+    };
+  }, [teardown]);
 
-  const { wc, status: nodeStatus, bootTerminal } = useWebContainer();
+  const { wc, status: nodeStatus, bootTerminal, teardown } = useWebContainer();
 
   useEffect(() => {
     axios
@@ -437,13 +442,16 @@ export default function Room() {
     setOutput("");
     try {
       const code = editorRef.current.getValue();
-      const res = await axios.post("https://codecollab-d0p4.onrender.com/api/execute/run", {
-        code,
-        language: activeFile.language,
-        roomId,
-        userId,
-        username,
-      });
+      const res = await axios.post(
+        "https://codecollab-d0p4.onrender.com/api/execute/run",
+        {
+          code,
+          language: activeFile.language,
+          roomId,
+          userId,
+          username,
+        },
+      );
       setOutput(res.data.output);
     } catch {
       setOutput("Execution error.");
