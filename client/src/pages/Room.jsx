@@ -109,13 +109,8 @@ export default function Room() {
   useEffect(() => {
     previewRef.current = preview;
   }, [preview]);
-  useEffect(() => {
-    return () => {
-      teardown();
-    };
-  }, [teardown]);
 
-  const { wc, status: nodeStatus, bootTerminal, teardown } = useWebContainer();
+  const { wc, status: nodeStatus, bootTerminal} = useWebContainer();
 
   useEffect(() => {
     axios
