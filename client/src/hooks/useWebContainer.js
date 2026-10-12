@@ -4,24 +4,24 @@ import { WebContainer } from "@webcontainer/api";
 // ─────────────────────────────────────────────────────────────────────────────
 // useWebContainer
 //
-// Changes vs. original:
-//  1. bootPromiseRef cleanup moved to `finally` so concurrent callers always
+//  1. bootPromiseRef cleanup lives in `finally`, so concurrent callers always
 //     get the same instance instead of double-booting.
-//  2. Writes a minimal package.json + an empty index.js so `jsh` has a
-//     sensible working directory from the start.
-//  3. Exposes `teardown()` so the Room page can fully destroy the instance
-//     when the user leaves the room (prevents "boot called twice" errors on
-//     page navigation in dev mode / StrictMode double-invocation).
+//  2. bootTerminal(fileCache, fileList) mounts real folders and nested files,
+//     so `cd client`, `ls`, etc. match what you see in the explorer.
+//  3. syncFile creates missing parent folders before writing.
+//  4. teardown() fully destroys the instance when the Room unmounts.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function useWebContainer() {
-  const [status,     setStatus]     = useState("idle");
+  const [status, setStatus] = useState("idle");
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [wc,         setWc]         = useState(null);
+  const [wc, setWc] = useState(null);
 
-  const wcRef           = useRef(null);
-  const bootPromiseRef  = useRef(null);
+  const wcRef = useRef(null);
+  const bootPromiseRef = useRef(null);
 
-  const bootTerminal = useCallback(async (fileCache = {}) => {
+  // fileCache: { "index.html": "...", "client/App.jsx": "..." }
+  // fileList : the explorer's `files` array, used to find folder entries
+  const bootTerminal = useCallback(async (fileCache = {}, fileList = []) => {
     // Return existing live instance immediately
     if (wcRef.current) return wcRef.current;
 
@@ -36,12 +36,36 @@ export default function useWebContainer() {
       wcRef.current = instance;
       setWc(instance);
 
-      // ── Mount user files ─────────────────────────────────────────────────
+      // ── Mount user files (with real folders and nested paths) ────────────
       const files = {};
 
+      const ensureDir = (parts) => {
+        let node = files;
+        for (const part of parts) {
+          if (!node[part] || !node[part].directory) {
+            node[part] = { directory: {} };
+          }
+          node = node[part].directory;
+        }
+        return node;
+      };
+
+      const folderNames = new Set(
+        fileList.filter((f) => f.type === "folder").map((f) => f.name),
+      );
+
+      // Create every folder first, so empty ones exist too
+      folderNames.forEach((name) =>
+        ensureDir(name.split("/").filter(Boolean)),
+      );
+
+      // Then place every file inside its folder
       Object.entries(fileCache).forEach(([name, content]) => {
-        if (!name || name.includes("/")) return; // skip nested paths for now
-        files[name] = { file: { contents: content ?? "" } };
+        if (folderNames.has(name)) return;
+        const parts = name.split("/").filter(Boolean);
+        if (parts.length === 0) return;
+        const dir = ensureDir(parts.slice(0, -1));
+        dir[parts[parts.length - 1]] = { file: { contents: content ?? "" } };
       });
 
       // Always provide a package.json so npm / node resolve correctly
@@ -50,7 +74,8 @@ export default function useWebContainer() {
           file: {
             contents: JSON.stringify(
               { name: "project", version: "1.0.0", type: "module" },
-              null, 2
+              null,
+              2,
             ),
           },
         };
@@ -83,10 +108,16 @@ export default function useWebContainer() {
     }
   }, []);
 
-  // Sync a single file into the running container (called on editor saves)
+  // Sync a single file into the running container (called on editor changes)
   const syncFile = useCallback(async (filename, content) => {
     if (!wcRef.current) return;
     try {
+      const slash = filename.lastIndexOf("/");
+      if (slash > 0) {
+        await wcRef.current.fs.mkdir(filename.slice(0, slash), {
+          recursive: true,
+        });
+      }
       await wcRef.current.fs.writeFile(filename, content ?? "");
     } catch (err) {
       console.error("[useWebContainer] syncFile error:", err);
@@ -97,7 +128,9 @@ export default function useWebContainer() {
   // boot a fresh container without hitting the "already booted" error.
   const teardown = useCallback(() => {
     if (wcRef.current) {
-      try { wcRef.current.teardown(); } catch {}
+      try {
+        wcRef.current.teardown();
+      } catch {}
       wcRef.current = null;
     }
     bootPromiseRef.current = null;

@@ -111,7 +111,7 @@ export default function Room() {
   useEffect(() => {
     previewRef.current = preview;
   }, [preview]);
-  
+
   useEffect(() => {
     return () => {
       teardown();
@@ -495,7 +495,7 @@ export default function Room() {
       return;
     }
     setTerminalOpen(true);
-    await bootTerminal(fileContentCache.current);
+    await bootTerminal(fileContentCache.current,files);
   };
 
   if (!room) return <div style={styles.loading}>Loading room...</div>;
