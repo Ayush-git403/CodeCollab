@@ -99,7 +99,6 @@ export default function Room() {
   const isRemoteUpdate = useRef(false);
   const previewRef = useRef(false);
 
-  // Resizable panels
   const sidebar = useResize(220, 140, 480, "horizontal");
   const rightPanel = useResize(240, 160, 440, "horizontal");
   const termPanel = useResize(240, 100, 500, "vertical");
@@ -113,7 +112,6 @@ export default function Room() {
 
   const { wc, status: nodeStatus, bootTerminal } = useWebContainer();
 
-  // Load room
   useEffect(() => {
     axios
       .get(`https://codecollab-d0p4.onrender.com/api/room/${roomId}`)
@@ -127,7 +125,6 @@ export default function Room() {
     { name: "script.js", language: "javascript", content: "" },
   ];
 
-  // Socket events
   useEffect(() => {
     socket.emit("join_room", { roomId, username, color: userColor });
 
@@ -138,7 +135,6 @@ export default function Room() {
         fileContentCache.current[f.name] = f.content || "";
       });
       setFiles(serverFiles);
-      // Restore previously open tabs from localStorage
       const savedTabs = JSON.parse(
         localStorage.getItem(`tabs_${roomId}`) || "[]",
       );
@@ -152,7 +148,6 @@ export default function Room() {
           .filter(Boolean);
         setOpenTabs(tabFiles);
 
-        // Restore active file
         const savedActive = localStorage.getItem(`active_${roomId}`);
         const activeTab =
           tabFiles.find((f) => f.name === savedActive) || tabFiles[0];
@@ -292,7 +287,6 @@ export default function Room() {
     };
   }, [roomId, username]);
 
-  // Auto-save
   useEffect(() => {
     const interval = setInterval(async () => {
       const file = activeFileRef.current;
@@ -309,9 +303,7 @@ export default function Room() {
         });
         setSaveStatus("autosaved");
         setTimeout(() => setSaveStatus("idle"), 1500);
-      } catch {
-        /* silent */
-      }
+      } catch {}
     }, 10000);
     return () => clearInterval(interval);
   }, [roomId, username]);
@@ -364,14 +356,12 @@ export default function Room() {
       const updated = prev.find((t) => t.name === file.name)
         ? prev
         : [...prev, file];
-      // Save to localStorage
       localStorage.setItem(
         `tabs_${roomId}`,
         JSON.stringify(updated.map((t) => t.name)),
       );
       return updated;
     });
-    // Save active file
     localStorage.setItem(`active_${roomId}`, file.name);
     if (editorRef.current && monacoRef.current) {
       const content = fileContentCache.current[file.name] ?? "";
@@ -390,7 +380,6 @@ export default function Room() {
     e.stopPropagation();
     setOpenTabs((prev) => {
       const remaining = prev.filter((t) => t.name !== filename);
-      // Save updated tabs to localStorage
       localStorage.setItem(
         `tabs_${roomId}`,
         JSON.stringify(remaining.map((t) => t.name)),
@@ -491,6 +480,15 @@ export default function Room() {
     a.click();
   };
 
+  const toggleTerminal = async () => {
+    if (terminalOpen) {
+      setTerminalOpen(false);
+      return;
+    }
+    setTerminalOpen(true);
+    await bootTerminal(fileContentCache.current);
+  };
+
   if (!room) return <div style={styles.loading}>Loading room...</div>;
 
   const isHtml = activeFile?.language === "html";
@@ -516,7 +514,6 @@ export default function Room() {
         />
       ))}
 
-      {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.logo}>⚡</span>
@@ -540,9 +537,7 @@ export default function Room() {
         </div>
       </div>
 
-      {/* Body */}
       <div style={styles.body}>
-        {/* ── Sidebar ── */}
         <div
           ref={sidebar.frameRef}
           style={{ ...styles.sidebar, width: "220px" }}
@@ -567,12 +562,9 @@ export default function Room() {
           />
         </div>
 
-        {/* Sidebar resize handle */}
         <ResizeHandle onMouseDown={sidebar.startResize} direction="vertical" />
 
-        {/* ── Editor panel ── */}
         <div style={styles.editorPanel}>
-          {/* Empty state */}
           {openTabs.length === 0 && (
             <div style={styles.emptyState}>
               <div style={styles.emptyIcon}>⚡</div>
@@ -601,7 +593,6 @@ export default function Room() {
             </div>
           )}
 
-          {/* Tabs */}
           {openTabs.length > 0 && (
             <div style={styles.tabBar}>
               {openTabs.map((f) => {
@@ -635,7 +626,6 @@ export default function Room() {
             </div>
           )}
 
-          {/* Toolbar */}
           {openTabs.length > 0 && (
             <div style={styles.toolbar}>
               <div style={styles.breadcrumb}>
@@ -677,15 +667,7 @@ export default function Room() {
                     ...styles.runBtn,
                     background: terminalOpen ? "#30363D" : "#6E40C9",
                   }}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (terminalOpen) {
-                      setTerminalOpen(false);
-                      return;
-                    }
-                    setTerminalOpen(true);
-                    await bootTerminal(fileContentCache.current);
-                  }}
+                  onClick={toggleTerminal}
                 >
                   ⬛ {terminalOpen ? "Close Terminal" : "Terminal"}
                 </button>
@@ -693,7 +675,6 @@ export default function Room() {
             </div>
           )}
 
-          {/* Editor or Preview */}
           {openTabs.length > 0 &&
             (preview && isHtml ? (
               <iframe
@@ -729,7 +710,6 @@ export default function Room() {
 
           {output && <Terminal output={output} matched={null} />}
 
-          {/* Terminal */}
           {terminalOpen && (
             <>
               <ResizeHandle
@@ -746,26 +726,36 @@ export default function Room() {
           )}
         </div>
 
-        {/* Right panel resize handle */}
         <ResizeHandle
           onMouseDown={rightPanel.startResize}
           direction="vertical"
         />
 
-        {/* ── Right panel ── */}
         <div
           ref={rightPanel.frameRef}
           style={{ ...styles.rightPanel, width: "240px" }}
         >
           <div style={styles.infoCard}>
             <p style={styles.infoLabel}>🏠 Room</p>
-            <div style={styles.roomIdBox}>
-              <span style={styles.roomIdText}>{roomId}</span>
+            <div style={styles.roomIdRow}>
+              <div style={styles.roomIdBox}>
+                <span style={styles.roomIdText}>{roomId}</span>
+                <button
+                  style={styles.copyBtn}
+                  onClick={() => navigator.clipboard.writeText(roomId)}
+                >
+                  Copy
+                </button>
+              </div>
               <button
-                style={styles.copyBtn}
-                onClick={() => navigator.clipboard.writeText(roomId)}
+                style={{
+                  ...styles.termBtn,
+                  ...(terminalOpen ? styles.termBtnActive : {}),
+                }}
+                onClick={toggleTerminal}
+                title={terminalOpen ? "Close terminal" : "Open terminal"}
               >
-                Copy
+                {">_"}
               </button>
             </div>
             <p style={styles.infoSub}>
@@ -776,7 +766,6 @@ export default function Room() {
         </div>
       </div>
 
-      {/* Status bar */}
       <div style={styles.statusBar}>
         <span style={styles.statusItem}>⚡ CodeCollab Arena</span>
         {activeFile && (
@@ -1027,6 +1016,12 @@ const styles = {
     whiteSpace: "pre-line",
     lineHeight: "1.8",
   },
+  roomIdRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    marginBottom: "8px",
+  },
   roomIdBox: {
     display: "flex",
     alignItems: "center",
@@ -1035,7 +1030,8 @@ const styles = {
     border: "1px solid #30363D",
     borderRadius: "6px",
     padding: "6px 10px",
-    marginBottom: "8px",
+    flex: 1,
+    minWidth: 0,
   },
   roomIdText: {
     color: "#3FB950",
@@ -1052,6 +1048,24 @@ const styles = {
     padding: "2px 7px",
     cursor: "pointer",
     fontSize: "10px",
+  },
+  termBtn: {
+    background: "#21262D",
+    color: "#C9D1D9",
+    border: "1px solid #30363D",
+    borderRadius: "6px",
+    width: "34px",
+    height: "34px",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontFamily: "monospace",
+    fontWeight: "bold",
+    flexShrink: 0,
+  },
+  termBtnActive: {
+    background: "#FFFFFF",
+    color: "#0D1117",
+    border: "1px solid #FFFFFF",
   },
   statusBar: {
     background: "#1F4E79",

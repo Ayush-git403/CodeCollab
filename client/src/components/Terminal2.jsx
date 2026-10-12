@@ -6,13 +6,17 @@ import "@xterm/xterm/css/xterm.css";
 export default function Terminal2({ webcontainer }) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
-  const writerRef = useRef(null);
+  const writerRef = useRef(false);
   const lineRef = useRef("");
   const historyRef = useRef([]);
   const histIdxRef = useRef(-1);
   const cwdRef = useRef("~");
+  const processRef = useRef(null);
+  const readyRef = useRef(false);
+
   const [ready, setReady] = useState(false);
 
+  // Create and dispose the terminal UI.
   useEffect(() => {
     if (!terminalRef.current || xtermRef.current) return;
 
@@ -37,211 +41,324 @@ export default function Terminal2({ webcontainer }) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(terminalRef.current);
-    setTimeout(() => fit.fit(), 100);
     xtermRef.current = term;
 
+    const timer = setTimeout(() => {
+      try {
+        fit.fit();
+      } catch {
+        // Terminal may no longer be mounted.
+      }
+    }, 100);
+
     return () => {
-      term.dispose();
+      clearTimeout(timer);
+      processRef.current = null;
+      readyRef.current = false;
+      lineRef.current = "";
+      writerRef.current = false;
       xtermRef.current = null;
-      writerRef.current = null;
+      term.dispose();
     };
   }, []);
 
+  // Connect the terminal to the existing WebContainer.
   useEffect(() => {
-    if (!webcontainer || !xtermRef.current || writerRef.current) return;
+    const term = xtermRef.current;
 
-    const start = async () => {
-      const term = xtermRef.current;
+    if (!webcontainer || !term || writerRef.current) return;
 
-      term.writeln("\x1b[1;34m⚡ CodeCollab Terminal\x1b[0m");
-      term.writeln("\x1b[90mBooting Node.js environment...\x1b[0m");
+    let cancelled = false;
+    let dataDisposable = null;
+    let runningCommand = false;
 
-      try {
-        // Mount a basic shell script to disable echo
-        await webcontainer.fs.writeFile(
-          "/.term-init.sh",
-          "stty -echo 2>/dev/null; exec jsh",
-        );
-      } catch {
-        /* ignore */
+    writerRef.current = true;
+    setReady(false);
+    readyRef.current = false;
+
+    const showPrompt = () => {
+      if (cancelled) return;
+
+      term.write(
+        `\r\n\x1b[1;32m${cwdRef.current}\x1b[0m \x1b[1;34m$\x1b[0m `
+      );
+    };
+
+    const runCommand = async (input) => {
+      const trimmed = input.trim();
+
+      if (!trimmed) {
+        showPrompt();
+        return;
       }
 
-      const showPrompt = () => {
-        term.write(
-          `\r\n\x1b[1;32m${cwdRef.current}\x1b[0m \x1b[1;34m$\x1b[0m `,
-        );
-      };
+      historyRef.current.unshift(trimmed);
+      if (historyRef.current.length > 50) {
+        historyRef.current.pop();
+      }
+      histIdxRef.current = -1;
 
-      const runCommand = async (cmd) => {
-        const trimmed = cmd.trim();
-        if (!trimmed) {
-          showPrompt();
-          return;
+      // Change directory.
+      if (trimmed === "cd" || trimmed.startsWith("cd ")) {
+        const target = trimmed === "cd" ? "~" : trimmed.slice(3).trim();
+
+        let nextCwd;
+
+        if (!target || target === "~") {
+          nextCwd = "/";
+        } else if (target.startsWith("/")) {
+          nextCwd = target;
+        } else {
+          const base = cwdRef.current === "~" ? "/" : cwdRef.current;
+          nextCwd = `${base.replace(/\/$/, "")}/${target}`;
         }
 
-        // Save to history
-        historyRef.current.unshift(trimmed);
-        if (historyRef.current.length > 50) historyRef.current.pop();
-        histIdxRef.current = -1;
-
-        // Handle cd manually since it changes directory
-        if (trimmed.startsWith("cd ") || trimmed === "cd") {
-          const target = trimmed === "cd" ? "~" : trimmed.slice(3).trim();
-          try {
-            if (target === "~" || target === "/") {
-              cwdRef.current = target === "~" ? "~" : "/";
-            } else if (target === "..") {
-              const parts = cwdRef.current.split("/").filter(Boolean);
-              parts.pop();
-              cwdRef.current = parts.length === 0 ? "~" : "/" + parts.join("/");
-            } else {
-              cwdRef.current =
-                cwdRef.current === "~"
-                  ? `~/${target}`
-                  : `${cwdRef.current}/${target}`;
-            }
-          } catch {
-            term.writeln(`\x1b[31mcd: ${target}: No such directory\x1b[0m`);
-          }
-          showPrompt();
-          return;
-        }
-
-        // Handle clear
-        if (trimmed === "clear" || trimmed === "cls") {
-          term.clear();
-          showPrompt();
-          return;
-        }
-
-        // Handle pwd
-        if (trimmed === "pwd") {
-          const display =
-            cwdRef.current === "~" ? "/home/user" : cwdRef.current;
-          term.writeln(`\r\n${display}`);
-          showPrompt();
-          return;
-        }
-
-        // Run everything else via WebContainer spawn
         try {
-          const parts = trimmed.split(" ");
-          const cmd = parts[0];
-          const args = parts.slice(1);
+          const result = await webcontainer.spawn("test", ["-d", nextCwd]);
+          const exitCode = await result.exit;
 
-          // Resolve path based on cwd
-          const cwd = cwdRef.current === "~" ? "/" : cwdRef.current;
+          if (cancelled) return;
 
-          const process = await webcontainer.spawn(cmd, args, { cwd });
-
-          term.write("\r\n");
-
-          process.output.pipeTo(
-            new WritableStream({
-              write(chunk) {
-                term.write(chunk);
-              },
-            }),
-          );
-
-          const code = await process.exit;
-          if (code !== 0 && code !== null) {
-            // Non-zero exit — already printed error via stderr
+          if (exitCode === 0) {
+            cwdRef.current = nextCwd === "/" ? "~" : nextCwd;
+          } else {
+            term.writeln(
+              `\r\n\x1b[31mcd: ${target}: No such directory\x1b[0m`
+            );
           }
-        } catch (err) {
-          term.writeln(`\r\n\x1b[31m${trimmed}: command not found\x1b[0m`);
+        } catch {
+          if (!cancelled) {
+            term.writeln(
+              `\r\n\x1b[31mcd: ${target}: No such directory\x1b[0m`
+            );
+          }
         }
 
         showPrompt();
-      };
+        return;
+      }
 
-      term.write("\r\n\x1b[90mReady! Type commands below.\x1b[0m");
-      showPrompt();
-      setReady(true);
+      // Clear screen.
+      if (trimmed === "clear" || trimmed === "cls") {
+        term.clear();
+        showPrompt();
+        return;
+      }
 
-      // Handle keyboard input
-      term.onData(async (data) => {
-        const code = data.charCodeAt(0);
+      // Print current directory.
+      if (trimmed === "pwd") {
+        term.writeln(cwdRef.current === "~" ? "/home/user" : cwdRef.current);
+        showPrompt();
+        return;
+      }
 
-        if (code === 13) {
-          // Enter
-          const cmd = lineRef.current;
-          lineRef.current = "";
-          await runCommand(cmd);
-        } else if (code === 127) {
-          // Backspace
-          if (lineRef.current.length > 0) {
-            lineRef.current = lineRef.current.slice(0, -1);
-            term.write("\b \b");
-          }
-        } else if (code === 3) {
-          // Ctrl+C
-          lineRef.current = "";
-          term.write("^C");
+      // Run commands through WebContainer.
+      try {
+        const cwd = cwdRef.current === "~" ? "/" : cwdRef.current;
+
+        // Basic quoted-argument support.
+        const parts = trimmed.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+        const cmd = parts.shift();
+        const args = parts.map((arg) =>
+          arg.startsWith('"') && arg.endsWith('"')
+            ? arg.slice(1, -1)
+            : arg
+        );
+
+        if (!cmd) {
           showPrompt();
-        } else if (code === 12) {
-          // Ctrl+L — clear screen
-          term.clear();
-          showPrompt();
-        } else if (data === "\x1b[A") {
-          // Arrow up — history
-          const history = historyRef.current;
-          if (history.length === 0) return;
-          histIdxRef.current = Math.min(
-            histIdxRef.current + 1,
-            history.length - 1,
-          );
-          const prev = history[histIdxRef.current];
-          // Clear current line
-          term.write("\b \b".repeat(lineRef.current.length));
-          lineRef.current = prev;
-          term.write(prev);
-        } else if (data === "\x1b[B") {
-          // Arrow down — history
-          const history = historyRef.current;
-          histIdxRef.current = Math.max(histIdxRef.current - 1, -1);
-          term.write("\b \b".repeat(lineRef.current.length));
-          if (histIdxRef.current === -1) {
-            lineRef.current = "";
-          } else {
-            lineRef.current = history[histIdxRef.current];
-            term.write(lineRef.current);
-          }
-        } else if (data === "\x1b[C") {
-          // Arrow right — ignore for now
-        } else if (data === "\x1b[D") {
-          // Arrow left — ignore for now
-        } else if (data === "\t") {
-          // Tab — basic autocomplete: list files
-          try {
-            const cwd = cwdRef.current === "~" ? "/" : cwdRef.current;
-            const process = await webcontainer.spawn("ls", [], { cwd });
-            let out = "";
-            process.output.pipeTo(
-              new WritableStream({
-                write(chunk) {
-                  out += chunk;
-                },
-              }),
-            );
-            await process.exit;
-            if (out.trim()) {
-              term.write("\r\n" + out);
-              showPrompt();
-              term.write(lineRef.current);
-            }
-          } catch {
-            /* ignore */
-          }
-        } else if (code >= 32) {
-          // Printable character
-          lineRef.current += data;
-          term.write(data);
+          return;
         }
-      });
+
+        const child = await webcontainer.spawn(cmd, args, { cwd });
+
+        if (cancelled) {
+          child.kill();
+          return;
+        }
+
+        processRef.current = child;
+        term.write("\r\n");
+
+        const outputPromise = child.output.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              if (!cancelled) term.write(chunk);
+            },
+          })
+        );
+
+        await child.exit;
+        await outputPromise.catch(() => {});
+
+        if (processRef.current === child) {
+          processRef.current = null;
+        }
+      } catch (err) {
+        if (!cancelled) {
+          term.writeln(
+            `\r\n\x1b[31m${err?.message || `${trimmed}: command failed`}\x1b[0m`
+          );
+        }
+      }
+
+      showPrompt();
+    };
+
+    const start = async () => {
+      term.writeln("\x1b[1;34m⚡ CodeCollab Terminal\x1b[0m");
+      term.writeln("\x1b[90mConnecting to Node.js environment...\x1b[0m");
+
+      try {
+        if (cancelled) return;
+
+        term.writeln("\r\n\x1b[90mReady! Type commands below.\x1b[0m");
+        showPrompt();
+
+        readyRef.current = true;
+        setReady(true);
+
+        dataDisposable = term.onData(async (data) => {
+          if (cancelled) return;
+
+          // Ctrl+C: interrupt the running process when possible.
+          if (data === "\x03") {
+            if (processRef.current) {
+              processRef.current.kill();
+              processRef.current = null;
+              term.write("^C");
+              lineRef.current = "";
+              showPrompt();
+            } else {
+              lineRef.current = "";
+              term.write("^C");
+              showPrompt();
+            }
+            return;
+          }
+
+          if (data === "\x0c") {
+            term.clear();
+            showPrompt();
+            return;
+          }
+
+          if (data === "\r") {
+            if (runningCommand) return;
+
+            const command = lineRef.current;
+            lineRef.current = "";
+            runningCommand = true;
+
+            try {
+              await runCommand(command);
+            } finally {
+              runningCommand = false;
+            }
+            return;
+          }
+
+          if (data === "\x7f") {
+            if (lineRef.current.length > 0) {
+              lineRef.current = lineRef.current.slice(0, -1);
+              term.write("\b \b");
+            }
+            return;
+          }
+
+          if (data === "\x1b[A") {
+            const history = historyRef.current;
+            if (history.length === 0) return;
+
+            histIdxRef.current = Math.min(
+              histIdxRef.current + 1,
+              history.length - 1
+            );
+
+            term.write("\r\x1b[2K");
+            lineRef.current = history[histIdxRef.current];
+            term.write(
+              `\x1b[1;32m${cwdRef.current}\x1b[0m \x1b[1;34m$\x1b[0m ${lineRef.current}`
+            );
+            return;
+          }
+
+          if (data === "\x1b[B") {
+            histIdxRef.current = Math.max(histIdxRef.current - 1, -1);
+
+            term.write("\r\x1b[2K");
+            lineRef.current =
+              histIdxRef.current === -1
+                ? ""
+                : historyRef.current[histIdxRef.current];
+
+            term.write(
+              `\x1b[1;32m${cwdRef.current}\x1b[0m \x1b[1;34m$\x1b[0m ${lineRef.current}`
+            );
+            return;
+          }
+
+          if (data === "\t") {
+            try {
+              const cwd = cwdRef.current === "~" ? "/" : cwdRef.current;
+              const child = await webcontainer.spawn("ls", [], { cwd });
+
+              let output = "";
+
+              const outputPromise = child.output.pipeTo(
+                new WritableStream({
+                  write(chunk) {
+                    output += chunk;
+                  },
+                })
+              );
+
+              await child.exit;
+              await outputPromise;
+
+              if (cancelled) return;
+
+              if (output.trim()) {
+                term.write(`\r\n${output}`);
+                showPrompt();
+                term.write(lineRef.current);
+              }
+            } catch {
+              // Ignore autocomplete errors.
+            }
+            return;
+          }
+
+          if (data >= " " && data !== "\x7f" && !data.startsWith("\x1b")) {
+            lineRef.current += data;
+            term.write(data);
+          }
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setReady(false);
+          readyRef.current = false;
+          term.writeln(
+            `\r\n\x1b[31mTerminal initialization failed: ${err.message}\x1b[0m`
+          );
+        }
+      }
     };
 
     start();
+
+    return () => {
+      cancelled = true;
+      dataDisposable?.dispose();
+
+      if (processRef.current) {
+        processRef.current.kill();
+        processRef.current = null;
+      }
+
+      writerRef.current = false;
+      readyRef.current = false;
+    };
   }, [webcontainer]);
 
   return (
@@ -260,12 +377,14 @@ export default function Terminal2({ webcontainer }) {
           <span style={styles.title}>Terminal</span>
           {ready && <span style={styles.cwd}>{cwdRef.current}</span>}
         </div>
+
         <span style={styles.hint}>
           {ready
             ? "node file.js  •  cd folder  •  ls  •  npm install"
             : "Starting Node.js environment..."}
         </span>
       </div>
+
       <div ref={terminalRef} style={styles.terminal} />
     </div>
   );
