@@ -61,6 +61,7 @@ export default function Terminal2({ webcontainer }) {
     term.loadAddon(fit);
     term.loadAddon(links);
     term.open(terminalRef.current);
+    term.focus();
 
     xtermRef.current = term;
     fitRef.current = fit;
