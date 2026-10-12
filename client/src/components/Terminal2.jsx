@@ -10,13 +10,13 @@ import "@xterm/xterm/css/xterm.css";
 //              key handler that could never run real commands.
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Terminal2({ webcontainer }) {
-  const terminalRef = useRef(null);   // DOM node xterm renders into
-  const xtermRef    = useRef(null);   // Terminal instance
-  const fitRef      = useRef(null);   // FitAddon instance
-  const shellRef    = useRef(null);   // jsh process
-  const inputRef    = useRef(null);   // WritableStreamDefaultWriter to shell stdin
-  const mountedRef  = useRef(false);  // guard: terminal DOM created?
-  const connectedRef= useRef(false);  // guard: shell connected to this wc?
+  const terminalRef = useRef(null); // DOM node xterm renders into
+  const xtermRef = useRef(null); // Terminal instance
+  const fitRef = useRef(null); // FitAddon instance
+  const shellRef = useRef(null); // jsh process
+  const inputRef = useRef(null); // WritableStreamDefaultWriter to shell stdin
+  const mountedRef = useRef(false); // guard: terminal DOM created?
+  const connectedRef = useRef(false); // guard: shell connected to this wc?
 
   const [status, setStatus] = useState("idle"); // idle | booting | ready | error
 
@@ -26,64 +26,70 @@ export default function Terminal2({ webcontainer }) {
     mountedRef.current = true;
 
     const term = new Terminal({
-      cursorBlink : true,
-      fontSize    : 13,
-      fontFamily  : "'Cascadia Code', 'Fira Code', Consolas, monospace",
-      scrollback  : 5000,
+      cursorBlink: true,
+      fontSize: 13,
+      fontFamily: "'Cascadia Code', 'Fira Code', Consolas, monospace",
+      scrollback: 5000,
       allowTransparency: true,
       theme: {
-        background       : "#1e1e1e",   // VS Code dark default
-        foreground       : "#cccccc",
-        cursor           : "#aeafad",
-        cursorAccent     : "#1e1e1e",
+        background: "#1e1e1e", // VS Code dark default
+        foreground: "#cccccc",
+        cursor: "#aeafad",
+        cursorAccent: "#1e1e1e",
         selectionBackground: "rgba(255,255,255,0.2)",
-        black            : "#1e1e1e",
-        red              : "#f44747",
-        green            : "#6a9955",
-        yellow           : "#d7ba7d",
-        blue             : "#569cd6",
-        magenta          : "#c678dd",
-        cyan             : "#4ec9b0",
-        white            : "#d4d4d4",
-        brightBlack      : "#808080",
-        brightRed        : "#f44747",
-        brightGreen      : "#b5cea8",
-        brightYellow     : "#dcdcaa",
-        brightBlue       : "#9cdcfe",
-        brightMagenta    : "#c586c0",
-        brightCyan       : "#4fc1ff",
-        brightWhite      : "#ffffff",
+        black: "#1e1e1e",
+        red: "#f44747",
+        green: "#6a9955",
+        yellow: "#d7ba7d",
+        blue: "#569cd6",
+        magenta: "#c678dd",
+        cyan: "#4ec9b0",
+        white: "#d4d4d4",
+        brightBlack: "#808080",
+        brightRed: "#f44747",
+        brightGreen: "#b5cea8",
+        brightYellow: "#dcdcaa",
+        brightBlue: "#9cdcfe",
+        brightMagenta: "#c586c0",
+        brightCyan: "#4fc1ff",
+        brightWhite: "#ffffff",
       },
     });
 
-    const fit   = new FitAddon();
+    const fit = new FitAddon();
     const links = new WebLinksAddon();
     term.loadAddon(fit);
     term.loadAddon(links);
     term.open(terminalRef.current);
 
     xtermRef.current = term;
-    fitRef.current   = fit;
+    fitRef.current = fit;
 
     // Initial fit after paint
     requestAnimationFrame(() => {
-      try { fit.fit(); } catch {}
+      requestAnimationFrame(() => {
+        try {
+          fit.fit();
+        } catch {}
+      });
     });
 
     // ── ResizeObserver keeps cols/rows in sync when panel is dragged ──
     const ro = new ResizeObserver(() => {
-      try { fit.fit(); } catch {}
+      try {
+        fit.fit();
+      } catch {}
     });
     ro.observe(terminalRef.current);
 
     return () => {
       ro.disconnect();
-      mountedRef.current  = false;
+      mountedRef.current = false;
       connectedRef.current = false;
-      shellRef.current     = null;
-      inputRef.current     = null;
-      xtermRef.current     = null;
-      fitRef.current       = null;
+      shellRef.current = null;
+      inputRef.current = null;
+      xtermRef.current = null;
+      fitRef.current = null;
       term.dispose();
     };
   }, []);
@@ -122,7 +128,10 @@ export default function Terminal2({ webcontainer }) {
           },
         });
 
-        if (cancelled) { shell.kill(); return; }
+        if (cancelled) {
+          shell.kill();
+          return;
+        }
 
         shellRef.current = shell;
 
@@ -132,12 +141,12 @@ export default function Terminal2({ webcontainer }) {
             write(chunk) {
               if (!cancelled) term.write(chunk);
             },
-          })
+          }),
         );
 
         // xterm keystrokes → shell stdin
         const writer = shell.input.getWriter();
-        inputWriter  = writer;
+        inputWriter = writer;
         inputRef.current = writer;
 
         dataDisposable = term.onData((data) => {
@@ -156,10 +165,11 @@ export default function Terminal2({ webcontainer }) {
           if (!cancelled) {
             connectedRef.current = false;
             setStatus("idle");
-            term.writeln("\r\n\x1b[2m  Shell exited. Reconnect by closing and reopening the terminal.\x1b[0m");
+            term.writeln(
+              "\r\n\x1b[2m  Shell exited. Reconnect by closing and reopening the terminal.\x1b[0m",
+            );
           }
         });
-
       } catch (err) {
         if (!cancelled) {
           setStatus("error");
@@ -176,12 +186,16 @@ export default function Terminal2({ webcontainer }) {
       dataDisposable?.dispose();
 
       if (shellRef.current) {
-        try { shellRef.current.kill(); } catch {}
+        try {
+          shellRef.current.kill();
+        } catch {}
         shellRef.current = null;
       }
 
       if (inputWriter) {
-        try { inputWriter.releaseLock(); } catch {}
+        try {
+          inputWriter.releaseLock();
+        } catch {}
         inputRef.current = null;
       }
 
@@ -191,9 +205,13 @@ export default function Terminal2({ webcontainer }) {
 
   // ── Status indicator colour ────────────────────────────────────────────────
   const dotColor =
-    status === "ready"   ? "#3fb950" :
-    status === "booting" ? "#e3b341" :
-    status === "error"   ? "#f78166" : "#6e7681";
+    status === "ready"
+      ? "#3fb950"
+      : status === "booting"
+        ? "#e3b341"
+        : status === "error"
+          ? "#f78166"
+          : "#6e7681";
 
   return (
     <div style={styles.wrapper}>
@@ -210,9 +228,9 @@ export default function Terminal2({ webcontainer }) {
         <div style={styles.tabRight}>
           <span style={styles.hint}>
             {status === "booting" && "Starting…"}
-            {status === "ready"   && ""}
-            {status === "error"   && "Shell error — check console"}
-            {status === "idle"    && "Not connected"}
+            {status === "ready" && ""}
+            {status === "error" && "Shell error — check console"}
+            {status === "idle" && "Not connected"}
           </span>
 
           {/* "+" new terminal button (wired up — calls bootTerminal externally) */}
@@ -222,10 +240,14 @@ export default function Terminal2({ webcontainer }) {
             onClick={() => {
               // Allow parent to wire this up via a prop if needed
             }}
-          >＋</button>
+          >
+            ＋
+          </button>
 
           {/* Maximise / minimise glyph (cosmetic only — wire up via prop) */}
-          <button style={styles.iconBtn} title="Maximise panel">⬡</button>
+          <button style={styles.iconBtn} title="Maximise panel">
+            ⬡
+          </button>
         </div>
       </div>
 
@@ -240,94 +262,93 @@ export default function Terminal2({ webcontainer }) {
 // ─────────────────────────────────────────────────────────────────────────────
 const styles = {
   wrapper: {
-    display      : "flex",
+    display: "flex",
     flexDirection: "column",
-    background   : "#1e1e1e",
-    height       : "100%",
-    minHeight    : "0",
-    overflow     : "hidden",
-    borderTop    : "1px solid #252526",
+    background: "#1e1e1e",
+    height: "100%", // keep this
+    minHeight: "0",
+    overflow: "hidden",
+    borderTop: "1px solid #252526",
   },
 
   // The narrow strip at the top that holds tab labels (like VS Code)
   tabBar: {
-    display        : "flex",
-    alignItems     : "center",
-    justifyContent : "space-between",
-    background     : "#252526",
-    height         : "35px",
-    flexShrink     : 0,
-    paddingLeft    : "4px",
-    paddingRight   : "6px",
-    borderBottom   : "1px solid #1e1e1e",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "#252526",
+    height: "35px",
+    flexShrink: 0,
+    paddingLeft: "4px",
+    paddingRight: "6px",
+    borderBottom: "1px solid #1e1e1e",
   },
 
   tabLeft: {
-    display   : "flex",
+    display: "flex",
     alignItems: "center",
-    height    : "100%",
+    height: "100%",
   },
 
   // The selected terminal tab — has the top-border accent like VS Code
   activeTab: {
-    display       : "flex",
-    alignItems    : "center",
-    gap           : "6px",
-    height        : "100%",
-    padding       : "0 12px",
-    borderTop     : "1px solid #0078d4",   // VS Code blue accent
-    background    : "#1e1e1e",
-    color         : "#cccccc",
-    fontSize      : "12px",
-    fontFamily    : "var(--vscode-font-family, sans-serif)",
-    userSelect    : "none",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    height: "100%",
+    padding: "0 12px",
+    borderTop: "1px solid #0078d4", // VS Code blue accent
+    background: "#1e1e1e",
+    color: "#cccccc",
+    fontSize: "12px",
+    fontFamily: "var(--vscode-font-family, sans-serif)",
+    userSelect: "none",
   },
 
   dot: {
-    width       : "7px",
-    height      : "7px",
+    width: "7px",
+    height: "7px",
     borderRadius: "50%",
-    flexShrink  : 0,
+    flexShrink: 0,
   },
 
   tabLabel: {
-    fontSize  : "12px",
-    color     : "#cccccc",
+    fontSize: "12px",
+    color: "#cccccc",
     fontFamily: "monospace",
   },
 
   tabRight: {
-    display   : "flex",
+    display: "flex",
     alignItems: "center",
-    gap       : "2px",
+    gap: "2px",
   },
 
   hint: {
-    color     : "#6e7681",
-    fontSize  : "11px",
+    color: "#6e7681",
+    fontSize: "11px",
     fontFamily: "monospace",
     marginRight: "6px",
   },
 
   iconBtn: {
-    background : "transparent",
-    border     : "none",
-    color      : "#cccccc",
-    fontSize   : "14px",
-    cursor     : "pointer",
-    padding    : "4px 6px",
+    background: "transparent",
+    border: "none",
+    color: "#cccccc",
+    fontSize: "14px",
+    cursor: "pointer",
+    padding: "4px 6px",
     borderRadius: "4px",
-    lineHeight : 1,
-    opacity    : 0.7,
+    lineHeight: 1,
+    opacity: 0.7,
   },
 
   // The actual xterm.js render target — fills remaining space
   xterm: {
-    flex    : 1,
+    flex: 1,
     minHeight: "0",
-    padding : "4px 8px 4px 4px",
+    padding: "4px 8px 4px 4px",
     overflow: "hidden",
-    // xterm.js needs the parent to have an explicit size for FitAddon to work
-    height  : "100%",
+    // Remove height: "100%" — let flex do the sizing instead
   },
 };

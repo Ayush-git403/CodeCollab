@@ -726,7 +726,12 @@ export default function Room() {
               />
               <div
                 ref={termPanel.frameRef}
-                style={{ height: "240px", flexShrink: 0 }}
+                style={{
+                  height: "240px",
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
               >
                 <Terminal2 webcontainer={wc} />
               </div>
