@@ -98,11 +98,19 @@ export default function Room() {
   const fileContentCache = useRef({});
   const isRemoteUpdate = useRef(false);
   const previewRef = useRef(false);
-
+  const syncTimers = useRef({});
   const sidebar = useResize(220, 140, 480, "horizontal");
   const rightPanel = useResize(240, 160, 440, "horizontal");
   const termPanel = useResize(240, 100, 500, "vertical");
-  const { wc, status: nodeStatus, bootTerminal, teardown } = useWebContainer();
+  const {
+    wc,
+    bootTerminal,
+    teardown,
+    syncFile,
+    syncMkdir,
+    syncRemove,
+    syncRename,
+  } = useWebContainer();
 
   useEffect(() => {
     activeFileRef.current = activeFile;
@@ -180,6 +188,7 @@ export default function Room() {
 
     socket.on("code_update", ({ filename, content }) => {
       fileContentCache.current[filename] = content;
+      syncFile(filename, content);
       if (activeFileRef.current?.name === filename && editorRef.current) {
         const position = editorRef.current.getPosition();
         isRemoteUpdate.current = true;
@@ -212,6 +221,7 @@ export default function Room() {
 
     socket.on("file_created", ({ file, message }) => {
       fileContentCache.current[file.name] = "";
+      syncFile(file.name, "");
       setFiles((prev) =>
         prev.find((f) => f.name === file.name) ? prev : [...prev, file],
       );
@@ -220,6 +230,7 @@ export default function Room() {
 
     socket.on("file_deleted", ({ filename, message }) => {
       delete fileContentCache.current[filename];
+      syncRemove(filename);
       setOpenTabs((prev) => prev.filter((t) => t.name !== filename));
       setFiles((prev) => {
         const remaining = prev.filter((f) => f.name !== filename);
@@ -252,6 +263,7 @@ export default function Room() {
       fileContentCache.current[newName] =
         fileContentCache.current[oldName] ?? "";
       delete fileContentCache.current[oldName];
+      syncRename(oldName, newName, fileContentCache.current[newName]);
       setFiles((prev) =>
         prev.map((f) =>
           f.name === oldName ? { ...f, name: newName, language } : f,
@@ -271,6 +283,7 @@ export default function Room() {
     });
 
     socket.on("folder_created", ({ folder, message }) => {
+      syncMkdir(folder.name);
       setFiles((prev) =>
         prev.find((f) => f.name === folder.name) ? prev : [...prev, folder],
       );
@@ -332,6 +345,11 @@ export default function Room() {
       if (!file) return;
       const content = editor.getValue();
       fileContentCache.current[file.name] = content;
+      clearTimeout(syncTimers.current[file.name]);
+      syncTimers.current[file.name] = setTimeout(
+        () => syncFile(file.name, content),
+        400,
+      );
       socket.emit("code_change", { roomId, filename: file.name, content });
       if (previewRef.current) {
         const htmlFile = Object.keys(fileContentCache.current).find((n) =>
@@ -495,7 +513,7 @@ export default function Room() {
       return;
     }
     setTerminalOpen(true);
-    await bootTerminal(fileContentCache.current,files);
+    await bootTerminal(fileContentCache.current, files);
   };
 
   if (!room) return <div style={styles.loading}>Loading room...</div>;

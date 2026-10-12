@@ -124,6 +124,45 @@ export default function useWebContainer() {
     }
   }, []);
 
+  // Create a folder (and any missing parents) inside the container
+  const syncMkdir = useCallback(async (path) => {
+    if (!wcRef.current || !path) return;
+    try {
+      await wcRef.current.fs.mkdir(path, { recursive: true });
+    } catch (err) {
+      console.error("[useWebContainer] syncMkdir error:", err);
+    }
+  }, []);
+
+  // Delete a file or folder (recursively) inside the container
+  const syncRemove = useCallback(async (path) => {
+    if (!wcRef.current || !path) return;
+    try {
+      await wcRef.current.fs.rm(path, { recursive: true, force: true });
+    } catch (err) {
+      console.error("[useWebContainer] syncRemove error:", err);
+    }
+  }, []);
+
+  // Rename / move a file or folder. If the container's fs has no rename,
+  // fall back to write-new + delete-old (works for files).
+  const syncRename = useCallback(async (oldPath, newPath, content) => {
+    if (!wcRef.current || !oldPath || !newPath) return;
+    const fs = wcRef.current.fs;
+    try {
+      const slash = newPath.lastIndexOf("/");
+      if (slash > 0) await fs.mkdir(newPath.slice(0, slash), { recursive: true });
+      if (typeof fs.rename === "function") {
+        await fs.rename(oldPath, newPath);
+      } else {
+        await fs.writeFile(newPath, content ?? "");
+        await fs.rm(oldPath, { recursive: true, force: true });
+      }
+    } catch (err) {
+      console.error("[useWebContainer] syncRename error:", err);
+    }
+  }, []);
+
   // Full teardown — call this when the Room unmounts so the next mount can
   // boot a fresh container without hitting the "already booted" error.
   const teardown = useCallback(() => {
@@ -145,6 +184,9 @@ export default function useWebContainer() {
     wc,
     bootTerminal,
     syncFile,
+    syncMkdir,
+    syncRemove,
+    syncRename,
     teardown,
   };
 }
