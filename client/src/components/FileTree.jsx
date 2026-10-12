@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import FileIcon from "./FileIcon";
 
 export default function FileTree({
   files, activeFile, onSelect,
@@ -60,95 +61,9 @@ export default function FileTree({
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  const getIcon = (filename) => {
-    const ext  = filename.split(".").pop().toLowerCase();
-    const name = filename.toLowerCase();
-
-    const byName = {
-      "package.json":       { color: "#8bc34a", label: "PKG", bg: "#1a2600" },
-      "package-lock.json":  { color: "#8bc34a", label: "PKG", bg: "#1a2600" },
-      "tsconfig.json":      { color: "#3178c6", label: "TSC", bg: "#001a33" },
-      "vite.config.js":     { color: "#646CFF", label: "VIT", bg: "#10102d" },
-      "vite.config.ts":     { color: "#646CFF", label: "VIT", bg: "#10102d" },
-      ".gitignore":         { color: "#f14e32", label: "GIT", bg: "#2d0a00" },
-      ".env":               { color: "#ecd53f", label: "ENV", bg: "#2d2600" },
-      "dockerfile":         { color: "#2496ED", label: "DCK", bg: "#001d2d" },
-      "readme.md":          { color: "#4285f4", label: "REA", bg: "#001433" },
-    };
-
-    const byExt = {
-      js:     { color: "#f1e05a", label: "JS",  bg: "#2d2800" },
-      jsx:    { color: "#61dafb", label: "JSX", bg: "#002633" },
-      ts:     { color: "#3178c6", label: "TS",  bg: "#001a33" },
-      tsx:    { color: "#61dafb", label: "TSX", bg: "#002633" },
-      py:     { color: "#3572A5", label: "PY",  bg: "#001220" },
-      html:   { color: "#e44d26", label: "HTM", bg: "#2d0a00" },
-      css:    { color: "#563d7c", label: "CSS", bg: "#1a0d2d" },
-      scss:   { color: "#c6538c", label: "SCO", bg: "#2d0019" },
-      cpp:    { color: "#f34b7d", label: "C++", bg: "#2d0018" },
-      c:      { color: "#888888", label: "C",   bg: "#1a1a1a" },
-      h:      { color: "#888888", label: "H",   bg: "#1a1a1a" },
-      java:   { color: "#b07219", label: "JAV", bg: "#2d1c00" },
-      go:     { color: "#00ADD8", label: "GO",  bg: "#002933" },
-      rs:     { color: "#dea584", label: "RS",  bg: "#2d1800" },
-      vue:    { color: "#41b883", label: "VUE", bg: "#0d2619" },
-      json:   { color: "#8bc34a", label: "JSN", bg: "#1a2600" },
-      md:     { color: "#4285f4", label: "MD",  bg: "#001433" },
-      yml:    { color: "#cb171e", label: "YML", bg: "#2d0003" },
-      yaml:   { color: "#cb171e", label: "YML", bg: "#2d0003" },
-      xml:    { color: "#f60",    label: "XML", bg: "#2d1400" },
-      sql:    { color: "#e38c00", label: "SQL", bg: "#2d1c00" },
-      sh:     { color: "#89e051", label: "SH",  bg: "#162600" },
-      env:    { color: "#ecd53f", label: "ENV", bg: "#2d2600" },
-      txt:    { color: "#8B949E", label: "TXT", bg: "#1a1f26" },
-      csv:    { color: "#8bc34a", label: "CSV", bg: "#1a2600" },
-      svg:    { color: "#FFB13B", label: "SVG", bg: "#2d2000" },
-      png:    { color: "#a074c4", label: "PNG", bg: "#1e0d2d" },
-      jpg:    { color: "#a074c4", label: "JPG", bg: "#1e0d2d" },
-    };
-
-    const icon = byName[name] || byExt[ext] || {
-      color: "#8B949E",
-      label: ext ? ext.substring(0, 3).toUpperCase() : "DOC",
-      bg: "#1a1f26",
-    };
-
-    const fs = icon.label.length > 2 ? 5 : 6;
-
-    return (
-      <svg width="16" height="16" viewBox="0 0 16 16"
-        style={{ flexShrink: 0, display: "block" }}>
-        <path
-          d="M9.5 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5L9.5 1z"
-          fill={icon.bg} stroke={icon.color} strokeWidth="0.75"
-        />
-        <path d="M9.5 1L13 5.5H9.5V1z" fill={icon.color} opacity="0.7" />
-        <text x="6.5" y="12.2" textAnchor="middle"
-          fontSize={fs}
-          fontFamily="'Segoe UI',Arial,sans-serif"
-          fontWeight="800" fill={icon.color} letterSpacing="-0.3">
-          {icon.label}
-        </text>
-      </svg>
-    );
-  };
-
-  const getFolderIcon = (open) => open ? (
-    <svg width="16" height="16" viewBox="0 0 16 16"
-      style={{ flexShrink: 0, display: "block" }}>
-      <path d="M1.5 4A1.5 1.5 0 0 1 3 2.5h3.172a1.5 1.5 0 0 1 1.06.44l.718.717A.5.5 0 0 0 8.306 4H13a1 1 0 0 1 1 1v.5H1V5a.5.5 0 0 1 .5-.5V4z"
-        fill="#DCAA6A"/>
-      <path d="M1 6.5h14l-1.25 6H2.25L1 6.5z" fill="#DCAA6A"/>
-    </svg>
-  ) : (
-    <svg width="16" height="16" viewBox="0 0 16 16"
-      style={{ flexShrink: 0, display: "block" }}>
-      <path d="M1.5 3A1.5 1.5 0 0 0 0 4.5v7A1.5 1.5 0 0 0 1.5 13h13a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 14.5 6H8l-1.5-1.5a1.5 1.5 0 0 0-1.06-.44H1.5z"
-        fill="#C09553"/>
-      <path d="M0 6h16v5.5A1.5 1.5 0 0 1 14.5 13H1.5A1.5 1.5 0 0 1 0 11.5V6z"
-        fill="#DCAA6A"/>
-    </svg>
-  );
+  // Icons now come from FileIcon.jsx
+  const getIcon = (filename) => <FileIcon name={filename} size={18} />;
+  const getFolderIcon = (open) => <FileIcon isFolder open={open} size={18} />;
 
   // ── Create / Rename ─────────────────────────────────────────────────────────
   const handleCreate = () => {
@@ -253,13 +168,27 @@ export default function FileTree({
             style={{
               ...S.fileRow,
               paddingLeft: `${8 + indent * 16}px`,
-              background: isActive ? "#2D3748" : isHov ? "#1F2937" : "transparent",
+              background: isActive
+                ? "linear-gradient(90deg, rgba(88,166,255,0.18), rgba(88,166,255,0.04))"
+                : isHov ? "rgba(255,255,255,0.06)" : "transparent",
               opacity: isDrag ? 0.3 : 1,
             }}
           >
             {isActive && <div style={S.activeBar} />}
-            {getIcon(dn)}
-            <span style={S.fileName}>{dn}</span>
+            <span style={{
+              display: "flex", flexShrink: 0,
+              transition: "transform 0.12s",
+              transform: isHov || isActive ? "scale(1.1)" : "scale(1)",
+            }}>
+              {getIcon(dn)}
+            </span>
+            <span style={{
+              ...S.fileName,
+              color: isActive ? "#FFFFFF" : "#C9D1D9",
+              fontWeight: isActive ? 600 : 400,
+            }}>
+              {dn}
+            </span>
             {isHov && (
               <div style={S.actions}>
                 <button style={S.actionBtn} title="Rename"
@@ -313,12 +242,16 @@ export default function FileTree({
               paddingLeft: `${8 + indent * 16}px`,
               background: isOver
                 ? "rgba(88,166,255,0.10)"
-                : isHov ? "#1F2937" : "transparent",
+                : isHov ? "rgba(255,255,255,0.06)" : "transparent",
               outline: isOver ? "1px dashed #58A6FF" : "none",
               outlineOffset: "-1px",
             }}
           >
-            <span style={S.arrow}>{isOpen ? "▾" : "▸"}</span>
+            <span style={{
+              ...S.arrow,
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.15s",
+            }}>▸</span>
             {getFolderIcon(isOpen)}
             <span style={S.folderName}>{folder.name}</span>
             {isOver && (
@@ -364,6 +297,7 @@ export default function FileTree({
                 <div style={{
                   color: "#4A5568", fontSize: 11, fontStyle: "italic",
                   padding: `3px 0 3px ${24 + indent * 16}px`,
+                  textAlign: "left",
                 }}>
                   empty — drag files here
                 </div>
@@ -481,7 +415,7 @@ const S = {
     display: "flex", flexDirection: "column",
     flex: 1, userSelect: "none",
     fontFamily: "-apple-system,'Segoe UI',sans-serif",
-    overflow: "hidden",
+    overflow: "hidden", textAlign: "left",
   },
   header: {
     display: "flex", justifyContent: "space-between",
@@ -501,33 +435,34 @@ const S = {
   },
   folderRow: {
     display: "flex", alignItems: "center",
-    gap: 5, height: 28, cursor: "pointer",
-    position: "relative", borderRadius: 3,
-    margin: "1px 4px", transition: "background 0.08s",
+    gap: 7, height: 30, cursor: "pointer",
+    position: "relative", borderRadius: 6,
+    margin: "1px 4px", transition: "background 0.12s",
   },
   arrow: {
     color: "#8B949E", fontSize: 9,
     width: 10, flexShrink: 0, textAlign: "center",
+    display: "inline-block",
   },
   folderName: {
     color: "#C9D1D9", fontSize: 13,
-    fontWeight: 500, flex: 1,
+    fontWeight: 500, flex: 1, textAlign: "left",
     whiteSpace: "nowrap", overflow: "hidden",
     textOverflow: "ellipsis",
   },
   fileRow: {
     display: "flex", alignItems: "center",
-    gap: 5, height: 26, cursor: "pointer",
-    position: "relative", borderRadius: 3,
-    margin: "1px 4px", transition: "background 0.08s",
+    gap: 8, height: 30, cursor: "pointer",
+    position: "relative", borderRadius: 6,
+    margin: "1px 4px", transition: "background 0.12s",
   },
   activeBar: {
-    position: "absolute", left: -4,
-    top: 2, bottom: 2, width: 2,
-    background: "#58A6FF", borderRadius: 2,
+    position: "absolute", left: 0,
+    top: 5, bottom: 5, width: 3,
+    background: "#58A6FF", borderRadius: 3,
   },
   fileName: {
-    color: "#C9D1D9", fontSize: 13, flex: 1,
+    color: "#C9D1D9", fontSize: 13, flex: 1, textAlign: "left",
     whiteSpace: "nowrap", overflow: "hidden",
     textOverflow: "ellipsis",
   },
@@ -550,7 +485,7 @@ const S = {
   },
   newRow: {
     display: "flex", alignItems: "center",
-    gap: 4, padding: "3px 8px",
+    gap: 6, padding: "3px 8px",
     background: "#161B22",
   },
   newInput: {
