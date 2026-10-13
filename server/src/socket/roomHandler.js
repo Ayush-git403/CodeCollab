@@ -41,10 +41,14 @@ module.exports = (io) => {
 
       // Send files
       if (roomFiles[roomId] && roomFiles[roomId].length > 0) {
-        const filesWithContent = roomFiles[roomId].map((f) => ({
-          ...f,
-          content: fileContents[roomId][f.name] ?? f.content ?? "",
-        }));
+        const filesWithContent = roomFiles[roomId].map((f) =>
+          f.type === "folder"
+            ? f
+            : {
+                ...f,
+                content: fileContents[roomId][f.name] ?? f.content ?? "",
+              },
+        );
         socket.emit("room_files", filesWithContent);
       } else {
         try {
@@ -55,14 +59,22 @@ module.exports = (io) => {
             [roomId],
           );
           if (result.rows.length > 0) {
-            const dbFiles = result.rows.map((r) => ({
-              name: r.filename,
-              language: r.language,
-              content: r.content || "",
-            }));
+            // Folders are stored with language = "folder" — restore their type
+            // so they come back as folders instead of empty files.
+            const dbFiles = result.rows.map((r) =>
+              r.language === "folder"
+                ? { name: r.filename, type: "folder" }
+                : {
+                    name: r.filename,
+                    language: r.language,
+                    content: r.content || "",
+                  },
+            );
             roomFiles[roomId] = dbFiles;
             dbFiles.forEach((f) => {
-              fileContents[roomId][f.name] = f.content;
+              if (f.type !== "folder") {
+                fileContents[roomId][f.name] = f.content;
+              }
             });
             socket.emit("room_files", dbFiles);
           } else {

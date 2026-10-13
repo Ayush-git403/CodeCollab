@@ -552,6 +552,7 @@ export default function Room() {
     const known = new Set(files.map((f) => f.name));
     const newFolders = folders.filter((n) => !known.has(n));
     const newFiles = found.filter((f) => !known.has(f.name));
+    console.log("[import]", { newFolders, newFiles: newFiles.map((f) => f.name) });
 
     newFolders.forEach((folderName) =>
       socket.emit("create_folder", { roomId, folderName, username }),
@@ -844,7 +845,7 @@ export default function Room() {
                   flexDirection: "column",
                 }}
               >
-                <Terminal2 webcontainer={wc} />
+                <Terminal2 webcontainer={wc} previewUrl={previewUrl} />
               </div>
             </>
           )}

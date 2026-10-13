@@ -8,7 +8,10 @@ import "@xterm/xterm/css/xterm.css";
 // Terminal2  –  VS Code-style integrated terminal powered by WebContainer's
 //              built-in jsh shell.
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Terminal2({ webcontainer }) {
+export default function Terminal2({ webcontainer, previewUrl }) {
+  const previewUrlRef = useRef(null); // latest dev-server preview URL
+  previewUrlRef.current = previewUrl;
+
   const terminalRef = useRef(null); // DOM node xterm renders into
   const xtermRef = useRef(null); // Terminal instance
   const fitRef = useRef(null); // FitAddon instance
@@ -56,7 +59,27 @@ export default function Terminal2({ webcontainer }) {
     });
 
     const fit = new FitAddon();
-    const links = new WebLinksAddon();
+    // localhost links only exist inside the container, so open the preview URL
+    // WebContainer assigned to the dev server instead
+    const links = new WebLinksAddon((_event, uri) => {
+      try {
+        const u = new URL(uri);
+        const isLocal = ["localhost", "127.0.0.1", "0.0.0.0"].includes(
+          u.hostname,
+        );
+        if (isLocal) {
+          const base = previewUrlRef.current;
+          if (base) {
+            window.open(
+              new URL(u.pathname + u.search + u.hash, base).toString(),
+              "_blank",
+            );
+          }
+          return; // dev server not ready yet: nothing to open
+        }
+      } catch {}
+      window.open(uri, "_blank", "noopener");
+    });
     term.loadAddon(fit);
     term.loadAddon(links);
     term.open(terminalRef.current);
