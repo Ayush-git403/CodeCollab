@@ -25,22 +25,41 @@ const COLORS = [
 router.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
 
-  if (!username || !email || !password) {
+  if (!username?.trim() || !email?.trim() || !password) {
     return res.status(400).json({ error: "All fields required" });
   }
+
   if (password.length < 6) {
     return res
       .status(400)
       .json({ error: "Password must be at least 6 characters" });
   }
 
+  // Normalize email and username to avoid accidental duplicates
+  const cleanUsername = username.trim();
+  const cleanEmail = email.trim().toLowerCase();
+
   try {
     const existing = await db.query(
-      "SELECT id FROM users WHERE email = $1 OR username = $2",
-      [email, username],
+      `SELECT id, username, email, provider
+       FROM users
+       WHERE LOWER(email) = $1 OR LOWER(username) = LOWER($2)
+       LIMIT 1`,
+      [cleanEmail, cleanUsername],
     );
+
     if (existing.rows.length > 0) {
-      return res.status(409).json({ error: "Email or username already taken" });
+      const user = existing.rows[0];
+
+      if (user.provider) {
+        return res.status(409).json({
+          error: "This account uses Google or GitHub sign-in.",
+        });
+      }
+
+      return res.status(409).json({
+        error: "Email or username already taken",
+      });
     }
 
     const hash = await bcrypt.hash(password, 12);
@@ -48,26 +67,31 @@ router.post("/signup", async (req, res) => {
 
     const result = await db.query(
       `INSERT INTO users (username, email, password_hash, avatar_color)
-       VALUES ($1, $2, $3, $4) RETURNING id, username, email, avatar_color`,
-      [username, email, hash, color],
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, username, email, avatar_color`,
+      [cleanUsername, cleanEmail, hash, color],
     );
 
     const user = result.rows[0];
-    if (!user.password_hash) {
-      return res
-        .status(400)
-        .json({ error: "This account uses Google or GitHub sign-in." });
-    }
+
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       JWT_SECRET,
       { expiresIn: "7d" },
     );
 
-    res.json({ token, user });
+    return res.status(201).json({ token, user });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Signup failed" });
+    console.error("Signup error:", err);
+
+    // Handle PostgreSQL unique-constraint violations
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "Email or username already taken",
+      });
+    }
+
+    return res.status(500).json({ error: "Signup failed" });
   }
 });
 
