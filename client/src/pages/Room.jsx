@@ -108,6 +108,7 @@ export default function Room() {
   const [preview, setPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [appOpen, setAppOpen] = useState(false); // dev-server preview panel
 
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
@@ -147,6 +148,10 @@ export default function Room() {
       teardown();
     };
   }, [teardown]);
+  // Show the app panel automatically when a dev server starts
+  useEffect(() => {
+    if (previewUrl) setAppOpen(true);
+  }, [previewUrl]);
 
   useEffect(() => {
     axios
@@ -335,7 +340,7 @@ export default function Room() {
   useEffect(() => {
     const interval = setInterval(async () => {
       const file = activeFileRef.current;
-      if (!editorRef.current || !file) return;
+      if (!editorRef.current || !file || previewRef.current) return;
       const content = editorRef.current.getValue();
       fileContentCache.current[file.name] = content;
       try {
@@ -550,9 +555,20 @@ export default function Room() {
   const pullFromTerminal = async () => {
     const { folders, files: found } = await scanFiles();
     const known = new Set(files.map((f) => f.name));
+
     const newFolders = folders.filter((n) => !known.has(n));
     const newFiles = found.filter((f) => !known.has(f.name));
-    console.log("[import]", { newFolders, newFiles: newFiles.map((f) => f.name) });
+    // files that already exist in the explorer but were changed in the terminal
+    const changedFiles = found.filter(
+      (f) =>
+        known.has(f.name) &&
+        (fileContentCache.current[f.name] ?? "") !== f.content,
+    );
+    console.log("[import]", {
+      newFolders,
+      newFiles: newFiles.map((f) => f.name),
+      changedFiles: changedFiles.map((f) => f.name),
+    });
 
     newFolders.forEach((folderName) =>
       socket.emit("create_folder", { roomId, folderName, username }),
@@ -563,9 +579,20 @@ export default function Room() {
       socket.emit("create_file", { roomId, filename: f.name, username });
     });
 
-    // Give the server a moment to create the entries, then store the content
+    changedFiles.forEach((f) => {
+      fileContentCache.current[f.name] = f.content;
+      // refresh the editor if this file is open
+      if (activeFileRef.current?.name === f.name && editorRef.current) {
+        isRemoteUpdate.current = true;
+        editorRef.current.setValue(f.content);
+        isRemoteUpdate.current = false;
+      }
+    });
+
+    // Give the server a moment to create new entries, then store the content
+    const toSave = [...newFiles, ...changedFiles];
     setTimeout(() => {
-      newFiles.forEach((f) => {
+      toSave.forEach((f) => {
         socket.emit("code_change", {
           roomId,
           filename: f.name,
@@ -583,10 +610,12 @@ export default function Room() {
       });
     }, 600);
 
+    const parts = [];
+    if (newFolders.length || newFiles.length)
+      parts.push(`${newFolders.length} folders, ${newFiles.length} files added`);
+    if (changedFiles.length) parts.push(`${changedFiles.length} files updated`);
     addToast(
-      newFiles.length || newFolders.length
-        ? `Imported ${newFolders.length} folders, ${newFiles.length} files`
-        : "Nothing new to import",
+      parts.length ? `Imported: ${parts.join(", ")}` : "Nothing new to import",
     );
   };
 
@@ -775,10 +804,10 @@ export default function Room() {
                 {previewUrl && (
                   <button
                     style={styles.previewBtn}
-                    onClick={() => window.open(previewUrl, "_blank")}
-                    title="Open the running dev server"
+                    onClick={() => setAppOpen((v) => !v)}
+                    title="Show or hide the running dev server"
                   >
-                    🌐 Open app
+                    {appOpen ? "🌐 Hide app" : "🌐 Open app"}
                   </button>
                 )}
                 <button
@@ -804,7 +833,8 @@ export default function Room() {
               />
             ) : (
               // The editor takes whatever space the terminal doesn't use
-              <div style={{ flex: 1, minHeight: 0 }}>
+              <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                 <MonacoEditor
                   height="100%"
                   language={activeFile?.language || "plaintext"}
@@ -825,6 +855,27 @@ export default function Room() {
                     fontFamily: "Fira Code, Consolas, monospace",
                   }}
                 />
+                </div>
+
+                {appOpen && previewUrl && (
+                  <div style={styles.appPanel}>
+                    <div style={styles.appBar}>
+                      <span style={styles.appBarTitle}>🌐 App preview</span>
+                      <button
+                        style={styles.appBarBtn}
+                        onClick={() => setAppOpen(false)}
+                        title="Hide preview"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <iframe
+                      src={previewUrl}
+                      title="App preview"
+                      style={styles.appFrame}
+                    />
+                  </div>
+                )}
               </div>
             ))}
 
@@ -845,7 +896,7 @@ export default function Room() {
                   flexDirection: "column",
                 }}
               >
-                <Terminal2 webcontainer={wc} previewUrl={previewUrl} />
+                <Terminal2 webcontainer={wc} onOpenApp={() => setAppOpen(true)} />
               </div>
             </>
           )}
@@ -1111,6 +1162,31 @@ const styles = {
     fontWeight: "bold",
   },
   previewFrame: { flex: 1, border: "none", background: "#fff", height: "100%" },
+  appPanel: {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    borderLeft: "1px solid #30363D",
+    background: "#fff",
+  },
+  appBar: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "#161B22",
+    padding: "4px 10px",
+    flexShrink: 0,
+  },
+  appBarTitle: { color: "#8B949E", fontSize: "11px" },
+  appBarBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#8B949E",
+    cursor: "pointer",
+    fontSize: "12px",
+  },
+  appFrame: { flex: 1, border: "none", background: "#fff", width: "100%" },
   rightPanel: {
     background: "#0D1117",
     borderLeft: "1px solid #30363D",
