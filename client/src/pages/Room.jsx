@@ -118,6 +118,7 @@ export default function Room() {
   const previewRef = useRef(false);
   const syncTimers = useRef({}); // debounce timers for editor → container sync
   const pulledRef = useRef(new Set()); // files imported from the terminal
+  const appFrameRef = useRef(null); // iframe showing the running dev server
 
   // Panel resizing. `true` = drag left/up to make the panel bigger.
   const sidebar = useResize(220, 140, 480, "horizontal");
@@ -550,6 +551,30 @@ export default function Room() {
     await bootTerminal(fileContentCache.current, files);
   };
 
+  // Show the running app in its own browser tab. The tab is a blank page of THIS
+  // site with the preview embedded in it. Opening the preview URL directly
+  // doesn't work, because WebContainer only connects previews embedded in the
+  // site that booted it. This tab depends on the CodeCollab tab staying open.
+  const openAppInNewTab = () => {
+    if (!previewUrl) return;
+    const win = window.open("", "_blank");
+    if (!win) {
+      addToast("Allow pop-ups for this site to open the app in a new tab");
+      return;
+    }
+    win.document.title = `${room?.name || "App"} – preview`;
+    win.document.body.style.margin = "0";
+    const frame = win.document.createElement("iframe");
+    frame.src = previewUrl;
+    frame.style.cssText =
+      "border:0;width:100vw;height:100vh;display:block;background:#fff";
+    win.document.body.appendChild(frame);
+  };
+
+  const fullscreenApp = () => {
+    appFrameRef.current?.requestFullscreen?.();
+  };
+
   // Import folders/files created from the terminal (npm create, mkdir, touch)
   // into the explorer and share them with the room.
   const pullFromTerminal = async () => {
@@ -861,15 +886,32 @@ export default function Room() {
                   <div style={styles.appPanel}>
                     <div style={styles.appBar}>
                       <span style={styles.appBarTitle}>🌐 App preview</span>
-                      <button
-                        style={styles.appBarBtn}
-                        onClick={() => setAppOpen(false)}
-                        title="Hide preview"
-                      >
-                        ✕
-                      </button>
+                      <div style={styles.appBarActions}>
+                        <button
+                          style={styles.appBarBtn}
+                          onClick={openAppInNewTab}
+                          title="Open the app in a new browser tab"
+                        >
+                          ↗ New tab
+                        </button>
+                        <button
+                          style={styles.appBarBtn}
+                          onClick={fullscreenApp}
+                          title="Full screen (Esc to exit)"
+                        >
+                          ⛶ Full screen
+                        </button>
+                        <button
+                          style={styles.appBarBtn}
+                          onClick={() => setAppOpen(false)}
+                          title="Hide preview"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
                     <iframe
+                      ref={appFrameRef}
                       src={previewUrl}
                       title="App preview"
                       style={styles.appFrame}
@@ -1179,12 +1221,15 @@ const styles = {
     flexShrink: 0,
   },
   appBarTitle: { color: "#8B949E", fontSize: "11px" },
+  appBarActions: { display: "flex", alignItems: "center", gap: "4px" },
   appBarBtn: {
     background: "transparent",
     border: "none",
     color: "#8B949E",
     cursor: "pointer",
-    fontSize: "12px",
+    fontSize: "11px",
+    padding: "2px 6px",
+    borderRadius: "4px",
   },
   appFrame: { flex: 1, border: "none", background: "#fff", width: "100%" },
   rightPanel: {
