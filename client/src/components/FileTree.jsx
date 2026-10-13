@@ -40,30 +40,46 @@ export default function FileTree({
     };
   }, []);
 
-  // ── Build tree ──────────────────────────────────────────────────────────────
-  const folders   = {};
-  const rootFiles = [];
+  // ── Build tree (supports any nesting depth) ────────────────────────────────
+  // Every folder node: { name: "react-app/src" (full path), label: "src",
+  //                      folders: { ...sub-folders }, files: [ ...files ] }
+  const root = { folders: {}, files: [] };
+
+  const ensureFolder = (parts) => {
+    let node = root;
+    let path = "";
+    for (const part of parts) {
+      path = path ? `${path}/${part}` : part;
+      if (!node.folders[part]) {
+        node.folders[part] = { name: path, label: part, folders: {}, files: [] };
+      }
+      node = node.folders[part];
+    }
+    return node;
+  };
 
   files.forEach((f) => {
-    if (f.type === "folder") folders[f.name] = { ...f, children: [] };
-  });
-
-  files.forEach((f) => {
-    if (f.type === "folder") return;
-    const parts = f.name.split("/");
-    if (parts.length > 1) {
-      const fn = parts[0];
-      if (!folders[fn]) folders[fn] = { name: fn, type: "folder", children: [] };
-      folders[fn].children.push({ ...f, displayName: parts.slice(1).join("/") });
+    const parts = f.name.split("/").filter(Boolean);
+    if (parts.length === 0) return;
+    if (f.type === "folder") {
+      ensureFolder(parts);
     } else {
-      rootFiles.push(f);
+      // parts.slice(0, -1) is empty for root files, which ensureFolder maps to root
+      const dir = ensureFolder(parts.slice(0, -1));
+      dir.files.push({ ...f, displayName: parts[parts.length - 1] });
     }
   });
+
+  const rootFolders = Object.values(root.folders);
+  const rootFiles   = root.files;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   // Icons now come from FileIcon.jsx
   const getIcon = (filename) => <FileIcon name={filename} size={18} />;
   const getFolderIcon = (open) => <FileIcon isFolder open={open} size={18} />;
+
+  const parentOf = (name) =>
+    name.includes("/") ? name.split("/").slice(0, -1).join("/") : null;
 
   // ── Create / Rename ─────────────────────────────────────────────────────────
   const handleCreate = () => {
@@ -121,8 +137,7 @@ export default function FileTree({
     e.preventDefault(); e.stopPropagation();
     const filename = e.dataTransfer.getData("filename");
     if (!filename) return;
-    const cur = filename.includes("/") ? filename.split("/")[0] : null;
-    if (cur !== name) onMoveFile(filename, name);
+    if (parentOf(filename) !== name) onMoveFile(filename, name);
     setDragOver(null); setDragging(null);
     setExpanded((p) => ({ ...p, [name]: true }));
   };
@@ -218,11 +233,13 @@ export default function FileTree({
     );
   };
 
-  // ── Render folder ───────────────────────────────────────────────────────────
+  // ── Render folder (recursive) ───────────────────────────────────────────────
   const renderFolder = (folder, indent = 0) => {
     const isOpen = !!expanded[folder.name];
     const isOver = dragOver === folder.name;
     const isHov  = hovered === `__f__${folder.name}`;
+    const subFolders = Object.values(folder.folders);
+    const isEmpty = subFolders.length === 0 && folder.files.length === 0;
 
     return (
       <div key={folder.name}>
@@ -253,7 +270,7 @@ export default function FileTree({
               transition: "transform 0.15s",
             }}>▸</span>
             {getFolderIcon(isOpen)}
-            <span style={S.folderName}>{folder.name}</span>
+            <span style={S.folderName}>{folder.label}</span>
             {isOver && (
               <span style={{ color: "#58A6FF", fontSize: 10, flexShrink: 0 }}>
                 drop here
@@ -278,8 +295,11 @@ export default function FileTree({
                 <button style={{ ...S.actionBtn, color: "#F78166" }} title="Delete folder"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`Delete folder "${folder.name}" and all files inside?`)) {
-                      folder.children?.forEach((f) => onDeleteFile(f.name));
+                    if (window.confirm(`Delete folder "${folder.label}" and everything inside?`)) {
+                      // delete everything below this folder (files and sub-folders), then the folder
+                      files
+                        .filter((f) => f.name.startsWith(`${folder.name}/`))
+                        .forEach((f) => onDeleteFile(f.name));
                       onDeleteFile(folder.name);
                     }
                   }}>
@@ -293,7 +313,7 @@ export default function FileTree({
 
           {isOpen && (
             <div>
-              {(!folder.children || folder.children.length === 0) && !creating && (
+              {isEmpty && !creating && (
                 <div style={{
                   color: "#4A5568", fontSize: 11, fontStyle: "italic",
                   padding: `3px 0 3px ${24 + indent * 16}px`,
@@ -302,7 +322,9 @@ export default function FileTree({
                   empty — drag files here
                 </div>
               )}
-              {folder.children?.map((f) => renderFile(f, indent + 1))}
+
+              {subFolders.map((sub) => renderFolder(sub, indent + 1))}
+              {folder.files.map((f) => renderFile(f, indent + 1))}
 
               {creating && createInFolder === folder.name && (
                 <div style={{
@@ -316,7 +338,7 @@ export default function FileTree({
                     color: "#58A6FF", fontSize: 10,
                     flexShrink: 0, fontFamily: "monospace",
                   }}>
-                    {folder.name}/
+                    {folder.label}/
                   </span>
                   <input autoFocus style={S.newInput}
                     placeholder="filename.js"
@@ -374,7 +396,7 @@ export default function FileTree({
         onDragOver={(e) => { if (!dragOver) e.preventDefault(); }}
         onDrop={onRootDrop}
       >
-        {Object.values(folders).map((f) => renderFolder(f))}
+        {rootFolders.map((f) => renderFolder(f))}
         {rootFiles.map((f) => renderFile(f))}
 
         {/* Root level create input */}
@@ -401,7 +423,7 @@ export default function FileTree({
           </div>
         )}
 
-        {Object.keys(folders).length > 0 && (
+        {rootFolders.length > 0 && (
           <div style={S.hint}>drag files onto folders to move</div>
         )}
       </div>

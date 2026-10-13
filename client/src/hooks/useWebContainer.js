@@ -163,6 +163,52 @@ export default function useWebContainer() {
     }
   }, []);
 
+  // Walk the container and return every folder and text file in it, so files
+  // created from the terminal (npm create, touch, mkdir) can be imported into
+  // the explorer. Heavy / generated paths are skipped.
+  const scanFiles = useCallback(async () => {
+    const instance = wcRef.current;
+    if (!instance) return { folders: [], files: [] };
+
+    const SKIP = new Set([
+      "node_modules",
+      ".git",
+      "dist",
+      ".cache",
+      "package-lock.json",
+    ]);
+    const MAX_SIZE = 200000; // skip anything bigger than ~200 KB
+
+    const folders = [];
+    const files = [];
+
+    const walk = async (dir) => {
+      const entries = await instance.fs.readdir(dir || ".", {
+        withFileTypes: true,
+      });
+      for (const entry of entries) {
+        if (SKIP.has(entry.name)) continue;
+        const path = dir ? `${dir}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          folders.push(path); // parents are always pushed before children
+          await walk(path);
+        } else {
+          try {
+            const content = await instance.fs.readFile(path, "utf-8");
+            if (content.length <= MAX_SIZE) files.push({ name: path, content });
+          } catch {}
+        }
+      }
+    };
+
+    try {
+      await walk("");
+    } catch (err) {
+      console.error("[useWebContainer] scanFiles error:", err);
+    }
+    return { folders, files };
+  }, []);
+
   // Full teardown — call this when the Room unmounts so the next mount can
   // boot a fresh container without hitting the "already booted" error.
   const teardown = useCallback(() => {
@@ -187,6 +233,7 @@ export default function useWebContainer() {
     syncMkdir,
     syncRemove,
     syncRename,
+    scanFiles,
     teardown,
   };
 }
