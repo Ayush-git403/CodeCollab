@@ -7,6 +7,7 @@ import Signup from "./pages/Signup";
 import UserDashboard from "./pages/UserDashboard";
 import Room from "./pages/Room";
 import CreateRoom from "./pages/CreateRoom";
+import Privacy from "./pages/Privacy";
 
 export default function App() {
   return (
@@ -20,7 +21,7 @@ export default function App() {
 
           import Privacy from "./pages/Privacy";
           <Route path="/privacy" element={<Privacy />} />//for oauth
-          
+
           {/* Protected pages */}
           <Route
             path="/app"
