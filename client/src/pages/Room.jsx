@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import MonacoEditor from "@monaco-editor/react";
 import axios from "axios";
 import { socket } from "../socket";
@@ -90,6 +90,7 @@ function ResizeHandle({ onMouseDown, direction = "vertical" }) {
 
 export default function Room() {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const username = localStorage.getItem("username") || "Anonymous";
   const userId = localStorage.getItem("userId") || "user1";
   const userColor = useRef(
@@ -109,6 +110,9 @@ export default function Room() {
   const [previewContent, setPreviewContent] = useState("");
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [appOpen, setAppOpen] = useState(false); // dev-server preview panel
+  const [menuOpen, setMenuOpen] = useState(false); // navbar Terminal menu
+  const [confirmExit, setConfirmExit] = useState(false); // exit-room dialog
+  const [hoverKey, setHoverKey] = useState(null); // hover state for navbar items
 
   const editorRef = useRef(null);
   const monacoRef = useRef(null);
@@ -119,6 +123,7 @@ export default function Room() {
   const syncTimers = useRef({}); // debounce timers for editor → container sync
   const pulledRef = useRef(new Set()); // files imported from the terminal
   const appFrameRef = useRef(null); // iframe showing the running dev server
+  const menuRef = useRef(null); // navbar menu container (for outside-click)
 
   // Panel resizing. `true` = drag left/up to make the panel bigger.
   const sidebar = useResize(220, 140, 480, "horizontal");
@@ -153,6 +158,27 @@ export default function Room() {
   useEffect(() => {
     if (previewUrl) setAppOpen(true);
   }, [previewUrl]);
+
+  // Close the navbar menu / exit dialog on outside click or Escape
+  useEffect(() => {
+    const onDown = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setConfirmExit(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   useEffect(() => {
     axios
@@ -325,6 +351,8 @@ export default function Room() {
     socket.on("file_error", (msg) => alert(msg));
 
     return () => {
+      // Tell the server we left, so the online list updates right away
+      socket.emit("leave_room", { roomId });
       socket.off("user_joined");
       socket.off("room_files");
       socket.off("room_not_started");
@@ -551,6 +579,24 @@ export default function Room() {
     await bootTerminal(fileContentCache.current, files);
   };
 
+  // Leave the room: save the open file first, then go back to the dashboard.
+  // The cleanup in the join effect sends "leave_room" to the server.
+  const leaveRoom = async () => {
+    const file = activeFileRef.current;
+    if (file && editorRef.current && !previewRef.current) {
+      try {
+        await axios.post("https://codecollab-d0p4.onrender.com/api/room/save", {
+          roomId,
+          filename: file.name,
+          language: file.language,
+          content: editorRef.current.getValue(),
+          savedBy: username,
+        });
+      } catch {}
+    }
+    navigate("/dashboard");
+  };
+
   // Show the running app in its own browser tab. The tab is a blank page of THIS
   // site with the preview embedded in it. Opening the preview URL directly
   // doesn't work, because WebContainer only connects previews embedded in the
@@ -669,6 +715,35 @@ export default function Room() {
         />
       ))}
 
+      {/* Exit-room confirmation */}
+      {confirmExit && (
+        <div style={styles.modalOverlay} onClick={() => setConfirmExit(false)}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>Leave this room?</h3>
+            <p style={styles.modalText}>
+              Your files stay saved, and you can rejoin anytime with the room
+              code{" "}
+              <strong style={{ color: "#3FB950", fontFamily: "monospace" }}>
+                {roomId}
+              </strong>
+              .
+            </p>
+            <div style={styles.modalActions}>
+              <button
+                style={styles.modalCancel}
+                onClick={() => setConfirmExit(false)}
+              >
+                Stay
+              </button>
+              <button style={styles.modalLeave} onClick={leaveRoom}>
+                Leave room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top bar */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
           <span style={styles.logo}>⚡</span>
@@ -676,19 +751,87 @@ export default function Room() {
           <span style={styles.separator}>›</span>
           <span style={styles.roomName}>{room.name}</span>
           <span style={styles.roomBadge}>#{roomId}</span>
+
+          {/* Menu bar */}
+          <div ref={menuRef} style={styles.menuBar}>
+            <button
+              style={{
+                ...styles.menuBtn,
+                ...(menuOpen || hoverKey === "menu" ? styles.menuBtnActive : {}),
+              }}
+              onMouseEnter={() => setHoverKey("menu")}
+              onMouseLeave={() => setHoverKey(null)}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              Terminal
+              {terminalOpen && <span style={styles.menuDot} />}
+            </button>
+
+            {menuOpen && (
+              <div style={styles.menuDropdown}>
+                <button
+                  style={{
+                    ...styles.menuItem,
+                    ...(hoverKey === "m-toggle" ? styles.menuItemHover : {}),
+                  }}
+                  onMouseEnter={() => setHoverKey("m-toggle")}
+                  onMouseLeave={() => setHoverKey(null)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    toggleTerminal();
+                  }}
+                >
+                  {terminalOpen ? "Close Terminal" : "Open Terminal"}
+                </button>
+                <button
+                  disabled={!terminalOpen}
+                  style={{
+                    ...styles.menuItem,
+                    ...(!terminalOpen
+                      ? styles.menuItemDisabled
+                      : hoverKey === "m-import"
+                        ? styles.menuItemHover
+                        : {}),
+                  }}
+                  onMouseEnter={() => setHoverKey("m-import")}
+                  onMouseLeave={() => setHoverKey(null)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    pullFromTerminal();
+                  }}
+                >
+                  Import files from Terminal
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        <div style={styles.usersRow}>
-          {users.map((u, i) => (
-            <div key={i} style={styles.userChip}>
-              <div
-                style={{
-                  ...styles.userDot,
-                  background: u.color || COLORS[i % COLORS.length],
-                }}
-              />
-              <span>{u.username}</span>
-            </div>
-          ))}
+
+        <div style={styles.headerRight}>
+          <div style={styles.usersRow}>
+            {users.map((u, i) => (
+              <div key={i} style={styles.userChip}>
+                <div
+                  style={{
+                    ...styles.userDot,
+                    background: u.color || COLORS[i % COLORS.length],
+                  }}
+                />
+                <span>{u.username}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            style={{
+              ...styles.exitBtn,
+              ...(hoverKey === "exit" ? styles.exitBtnHover : {}),
+            }}
+            onMouseEnter={() => setHoverKey("exit")}
+            onMouseLeave={() => setHoverKey(null)}
+            onClick={() => setConfirmExit(true)}
+          >
+            Exit room
+          </button>
         </div>
       </div>
 
@@ -860,26 +1003,26 @@ export default function Room() {
               // The editor takes whatever space the terminal doesn't use
               <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                <MonacoEditor
-                  height="100%"
-                  language={activeFile?.language || "plaintext"}
-                  theme="vs-dark"
-                  onMount={handleEditorMount}
-                  options={{
-                    fontSize: 14,
-                    minimap: { enabled: true },
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    wordWrap: "on",
-                    cursorBlinking: "smooth",
-                    lineNumbers: "on",
-                    renderLineHighlight: "all",
-                    bracketPairColorization: { enabled: true },
-                    formatOnPaste: true,
-                    tabSize: 2,
-                    fontFamily: "Fira Code, Consolas, monospace",
-                  }}
-                />
+                  <MonacoEditor
+                    height="100%"
+                    language={activeFile?.language || "plaintext"}
+                    theme="vs-dark"
+                    onMount={handleEditorMount}
+                    options={{
+                      fontSize: 14,
+                      minimap: { enabled: true },
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      wordWrap: "on",
+                      cursorBlinking: "smooth",
+                      lineNumbers: "on",
+                      renderLineHighlight: "all",
+                      bracketPairColorization: { enabled: true },
+                      formatOnPaste: true,
+                      tabSize: 2,
+                      fontFamily: "Fira Code, Consolas, monospace",
+                    }}
+                  />
                 </div>
 
                 {appOpen && previewUrl && (
@@ -938,7 +1081,10 @@ export default function Room() {
                   flexDirection: "column",
                 }}
               >
-                <Terminal2 webcontainer={wc} onOpenApp={() => setAppOpen(true)} />
+                <Terminal2
+                  webcontainer={wc}
+                  onOpenApp={() => setAppOpen(true)}
+                />
               </div>
             </>
           )}
@@ -965,19 +1111,9 @@ export default function Room() {
                   Copy
                 </button>
               </div>
-              <button
-                style={{
-                  ...styles.termBtn,
-                  ...(terminalOpen ? styles.termBtnActive : {}),
-                }}
-                onClick={toggleTerminal}
-                title={terminalOpen ? "Close terminal" : "Open terminal"}
-              >
-                {">_"}
-              </button>
             </div>
             <p style={styles.infoSub}>
-              {users.length + 1} user{users.length !== 0 ? "s" : ""} online
+              {users.length} user{users.length !== 1 ? "s" : ""} online
             </p>
           </div>
           <ChatBox roomId={roomId} username={username} />
@@ -1003,7 +1139,7 @@ export default function Room() {
           </>
         )}
         <span style={{ marginLeft: "auto", ...styles.statusItem }}>
-          {users.length + 1} collaborator{users.length !== 0 ? "s" : ""}
+          {users.length} collaborator{users.length !== 1 ? "s" : ""}
         </span>
       </div>
     </div>
@@ -1037,8 +1173,11 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     flexShrink: 0,
+    position: "relative",
+    zIndex: 50,
   },
   headerLeft: { display: "flex", alignItems: "center", gap: "8px" },
+  headerRight: { display: "flex", alignItems: "center", gap: "12px" },
   logo: { fontSize: "16px" },
   appName: { color: "#58A6FF", fontWeight: "bold", fontSize: "14px" },
   separator: { color: "#30363D", fontSize: "16px" },
@@ -1051,6 +1190,126 @@ const styles = {
     padding: "2px 6px",
     borderRadius: "4px",
   },
+
+  // ── Navbar menu ───────────────────────────────────────────────────────────
+  menuBar: {
+    position: "relative",
+    marginLeft: "10px",
+    display: "flex",
+    alignItems: "center",
+  },
+  menuBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#C9D1D9",
+    fontSize: "12px",
+    padding: "4px 10px",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  menuBtnActive: { background: "#30363D" },
+  menuDot: {
+    width: "6px",
+    height: "6px",
+    borderRadius: "50%",
+    background: "#3FB950",
+  },
+  menuDropdown: {
+    position: "absolute",
+    top: "calc(100% + 6px)",
+    left: 0,
+    background: "#161B22",
+    border: "1px solid #30363D",
+    borderRadius: "8px",
+    minWidth: "220px",
+    padding: "4px",
+    boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+    zIndex: 500,
+  },
+  menuItem: {
+    display: "flex",
+    width: "100%",
+    background: "transparent",
+    border: "none",
+    color: "#C9D1D9",
+    fontSize: "12px",
+    padding: "8px 10px",
+    borderRadius: "6px",
+    cursor: "pointer",
+    textAlign: "left",
+    fontFamily: "inherit",
+  },
+  menuItemHover: { background: "#21262D", color: "#FFFFFF" },
+  menuItemDisabled: { opacity: 0.4, cursor: "not-allowed" },
+
+  // ── Exit button + dialog ──────────────────────────────────────────────────
+  exitBtn: {
+    background: "transparent",
+    color: "#F78166",
+    border: "1px solid rgba(247,129,102,0.5)",
+    borderRadius: "6px",
+    padding: "4px 12px",
+    fontSize: "12px",
+    fontWeight: "600",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    transition: "all 0.15s",
+  },
+  exitBtnHover: {
+    background: "rgba(247,129,102,0.12)",
+    borderColor: "#F78166",
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modal: {
+    background: "#161B22",
+    border: "1px solid #30363D",
+    borderRadius: "12px",
+    padding: "22px",
+    width: "340px",
+    maxWidth: "90vw",
+    boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+    textAlign: "left",
+  },
+  modalTitle: { color: "#FFFFFF", fontSize: "16px", margin: "0 0 8px" },
+  modalText: {
+    color: "#8B949E",
+    fontSize: "13px",
+    lineHeight: 1.5,
+    margin: "0 0 18px",
+  },
+  modalActions: { display: "flex", justifyContent: "flex-end", gap: "8px" },
+  modalCancel: {
+    background: "#21262D",
+    color: "#C9D1D9",
+    border: "1px solid #30363D",
+    borderRadius: "6px",
+    padding: "7px 14px",
+    fontSize: "12px",
+    cursor: "pointer",
+  },
+  modalLeave: {
+    background: "#DA3633",
+    color: "#FFFFFF",
+    border: "1px solid #F85149",
+    borderRadius: "6px",
+    padding: "7px 14px",
+    fontSize: "12px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+
   usersRow: { display: "flex", gap: "6px" },
   userChip: {
     display: "flex",
@@ -1294,24 +1553,6 @@ const styles = {
     padding: "2px 7px",
     cursor: "pointer",
     fontSize: "10px",
-  },
-  termBtn: {
-    background: "#21262D",
-    color: "#C9D1D9",
-    border: "1px solid #30363D",
-    borderRadius: "6px",
-    width: "34px",
-    height: "34px",
-    cursor: "pointer",
-    fontSize: "12px",
-    fontFamily: "monospace",
-    fontWeight: "bold",
-    flexShrink: 0,
-  },
-  termBtnActive: {
-    background: "#FFFFFF",
-    color: "#0D1117",
-    border: "1px solid #FFFFFF",
   },
   statusBar: {
     background: "#1F4E79",

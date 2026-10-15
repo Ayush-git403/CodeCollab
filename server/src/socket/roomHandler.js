@@ -5,6 +5,16 @@ const db = require("../models");
 
 module.exports = (io) => {
   io.on("connection", (socket) => {
+    // Remove this socket from a room's online list and tell everyone else
+    const removeFromRoom = (roomId) => {
+      if (!rooms[roomId]?.[socket.id]) return;
+      delete rooms[roomId][socket.id];
+      socket.leave(roomId);
+      io.to(roomId).emit("user_joined", {
+        users: Object.values(rooms[roomId]),
+      });
+    };
+
     socket.on("join_room", async ({ roomId, username, color }) => {
       socket.join(roomId);
       if (!rooms[roomId]) rooms[roomId] = {};
@@ -86,6 +96,9 @@ module.exports = (io) => {
         }
       }
     });
+
+    // User exits the room (Exit room button, or the room page was closed)
+    socket.on("leave_room", ({ roomId }) => removeFromRoom(roomId));
 
     socket.on("start_project", async ({ roomId, files }) => {
       roomFiles[roomId] = files;
@@ -247,14 +260,7 @@ module.exports = (io) => {
     });
 
     socket.on("disconnect", () => {
-      for (const roomId in rooms) {
-        if (rooms[roomId][socket.id]) {
-          delete rooms[roomId][socket.id];
-          io.to(roomId).emit("user_joined", {
-            users: Object.values(rooms[roomId]),
-          });
-        }
-      }
+      for (const roomId in rooms) removeFromRoom(roomId);
     });
   });
 };
