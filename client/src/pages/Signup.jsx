@@ -191,6 +191,11 @@ export default function Signup() {
           Already have an account?{" "}
           <Link to="/login" style={S.footerLink}>Sign in</Link>
         </p>
+
+        <p style={S.legal}>
+          By continuing you agree to our{" "}
+          <Link to="/privacy" style={S.footerLink}>Privacy Policy</Link>
+        </p>
       </div>
     </div>
   );
@@ -341,6 +346,12 @@ const S = {
     fontSize: "13px",
     textAlign: "center",
     margin: 0,
+  },
+  legal: {
+    color: "#6E7681",
+    fontSize: "12px",
+    textAlign: "center",
+    margin: "-8px 0 0",
   },
   footerLink: {
     color: "#FFFFFF",

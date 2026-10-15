@@ -18,20 +18,34 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
+          import Privacy from "./pages/Privacy";
+          <Route path="/privacy" element={<Privacy />} />//for oauth
+          
           {/* Protected pages */}
           <Route
             path="/app"
-            element={<ProtectedRoute><UserDashboard /></ProtectedRoute>}
+            element={
+              <ProtectedRoute>
+                <UserDashboard />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/create"
-            element={<ProtectedRoute><CreateRoom /></ProtectedRoute>}
+            element={
+              <ProtectedRoute>
+                <CreateRoom />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/room/:roomId"
-            element={<ProtectedRoute><Room /></ProtectedRoute>}
+            element={
+              <ProtectedRoute>
+                <Room />
+              </ProtectedRoute>
+            }
           />
-
           {/* Keep old dashboard links working */}
           <Route path="/dashboard" element={<Navigate to="/app" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
