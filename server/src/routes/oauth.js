@@ -42,7 +42,7 @@ function beginAuth(res, authUrl, params) {
   const state = crypto.randomBytes(16).toString("hex");
   res.cookie("oauth_state", state, {
     httpOnly: true,
-    secure: true,
+    secure: (API_URL || "").startsWith("https"),
     sameSite: "lax",
     maxAge: 10 * 60 * 1000,
   });
@@ -59,7 +59,7 @@ async function uniqueUsername(base) {
   const clean = (base || "user").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20) || "user";
   let name = clean;
   for (;;) {
-    const { rowCount } = await db.query("SELECT 1 FROM users WHERE username = $1", [name]);
+    const { rowCount } = await db.query("SELECT 1 FROM users WHERE LOWER(username) = LOWER($1)", [name]);
     if (!rowCount) return name;
     name = `${clean}${Math.floor(1000 + Math.random() * 9000)}`;
   }
@@ -74,15 +74,16 @@ async function findOrCreateUser({ provider, providerId, email, emailVerified, na
   if (byProvider.rows[0]) return byProvider.rows[0];
 
   if (!email || !emailVerified) throw new Error("No verified email on provider account");
+  const cleanEmail = email.trim().toLowerCase();
 
   // Link to an existing password account that uses the same (verified) email
   const linked = await db.query(
     `UPDATE users
         SET provider = COALESCE(provider, $1),
             provider_id = COALESCE(provider_id, $2)
-      WHERE email = $3
+      WHERE LOWER(email) = $3
       RETURNING *`,
-    [provider, providerId, email],
+    [provider, providerId, cleanEmail],
   );
   if (linked.rows[0]) return linked.rows[0];
 
@@ -90,8 +91,8 @@ async function findOrCreateUser({ provider, providerId, email, emailVerified, na
     `INSERT INTO users (username, email, provider, provider_id, avatar_color)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
     [
-      await uniqueUsername(name || email.split("@")[0]),
-      email,
+      await uniqueUsername(name || cleanEmail.split("@")[0]),
+      cleanEmail,
       provider,
       providerId,
       COLORS[Math.floor(Math.random() * COLORS.length)],

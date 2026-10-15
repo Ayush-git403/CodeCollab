@@ -99,20 +99,30 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (!email?.trim() || !password) {
     return res.status(400).json({ error: "Email and password required" });
   }
 
   try {
-    const result = await db.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
+    // Case-insensitive, to match the lowercase emails stored by signup/OAuth
+    const result = await db.query(
+      "SELECT * FROM users WHERE LOWER(email) = $1",
+      [email.trim().toLowerCase()],
+    );
 
     if (result.rows.length === 0) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const user = result.rows[0];
+
+    // Accounts created via Google/GitHub have no password
+    if (!user.password_hash) {
+      return res.status(400).json({
+        error: "This account uses Google or GitHub sign-in.",
+      });
+    }
+
     const valid = await bcrypt.compare(password, user.password_hash);
 
     if (!valid) {
