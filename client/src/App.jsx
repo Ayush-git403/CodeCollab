@@ -8,6 +8,7 @@ import UserDashboard from "./pages/UserDashboard";
 import Room from "./pages/Room";
 import CreateRoom from "./pages/CreateRoom";
 import Privacy from "./pages/Privacy";
+import OAuthCallback from "./pages/OAuthCallback";
 
 export default function App() {
   return (
@@ -18,10 +19,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-
-          import Privacy from "./pages/Privacy";
-          <Route path="/privacy" element={<Privacy />} />//for oauth
-
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
+          <Route path="/privacy" element={<Privacy />} />   //for google and github oauth privacy policy
+          
           {/* Protected pages */}
           <Route
             path="/app"
