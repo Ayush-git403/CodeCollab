@@ -8,7 +8,6 @@ const db = require("../models");
 
 const router = express.Router();
 
-const JWT_SECRET = process.env.JWT_SECRET || "codecollab_secret_2026"; // same as auth.js
 const COLORS = [
   "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD",
   "#98D8C8", "#F7DC6F", "#58A6FF", "#3FB950", "#E3B341", "#F78166",

@@ -4,7 +4,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const db = require("../models");
 
-const JWT_SECRET = process.env.JWT_SECRET || "codecollab_secret_2026";
 
 const COLORS = [
   "#FF6B6B",
