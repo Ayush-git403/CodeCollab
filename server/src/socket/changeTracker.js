@@ -1,4 +1,4 @@
-const db = require("../db"); // same require as your room.js
+const db = require("../models");
 const { seedBaseline } = require("../routes/revisions");
 
 module.exports = function registerChangeTracker(io, socket) {
