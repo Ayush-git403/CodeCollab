@@ -1,6 +1,6 @@
 const express = require("express");
 const router  = express.Router();
-const db      = require("../db"); // same require as your room.js
+const db = require("../models");
 
 // Store the file's current content as the "before" version the first time
 // anyone opens or saves it, so there is always something to compare against.
