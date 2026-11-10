@@ -11,6 +11,8 @@ const authRoutes = require("./routes/auth");
 const chatRoutes = require("./routes/chat");
 const roomHandler = require("./socket/roomHandler");
 const createYjsServer = require("./socket/yjsServer");
+const { router: revisionRoutes } = require("./routes/revisions");
+const registerChangeTracker      = require("./socket/changeTracker");
 
 const app = express();
 const server = http.createServer(app);
@@ -51,8 +53,11 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/auth", require("./routes/oauth"));
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/revisions", revisionRoutes);
+
 
 roomHandler(io);
+io.on("connection", (socket) => registerChangeTracker(io, socket));
 createYjsServer(server);
 
 const PORT = process.env.PORT || 5000;

@@ -10,6 +10,8 @@ import Toast from "../components/Toast";
 import Terminal2 from "../components/Terminal2";
 import useWebContainer from "../hooks/useWebContainer";
 import useResize from "../hooks/useResize";
+import useFileChanges from "../hooks/useFileChanges";
+import FileChangeCenter from "../components/FileChangeCenter";
 
 const COLORS = [
   "#FF6B6B",
@@ -92,6 +94,7 @@ export default function Room() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const username = localStorage.getItem("username") || "Anonymous";
+  const changes = useFileChanges({ roomId, username });
   const userId = localStorage.getItem("userId") || "user1";
   const userColor = useRef(
     COLORS[Math.floor(Math.random() * COLORS.length)],
@@ -146,6 +149,9 @@ export default function Room() {
   useEffect(() => {
     activeFileRef.current = activeFile;
   }, [activeFile]);
+  useEffect(() => {
+    if (activeFile?.name) changes.checkFile(activeFile.name);
+  }, [activeFile?.name]);
   useEffect(() => {
     previewRef.current = preview;
   }, [preview]);
@@ -542,21 +548,18 @@ export default function Room() {
   };
 
   const saveCode = async () => {
+    if (!activeFile || !editorRef.current) return;
     setSaveStatus("saving");
     const content = editorRef.current.getValue();
     fileContentCache.current[activeFile.name] = content;
-    try {
-      await axios.post("https://codecollab-d0p4.onrender.com/api/room/save", {
-        roomId,
-        filename: activeFile.name,
-        language: activeFile.language,
-        content,
-        savedBy: username,
-      });
-      setSaveStatus("saved");
-    } catch {
-      setSaveStatus("error");
-    }
+
+    const res = await changes.saveFile({
+      filename: activeFile.name,
+      language: activeFile.language,
+      content,
+    });
+
+    setSaveStatus(res.ok ? "saved" : "error");
     setTimeout(() => setSaveStatus("idle"), 2000);
   };
 
@@ -683,13 +686,14 @@ export default function Room() {
 
     const parts = [];
     if (newFolders.length || newFiles.length)
-      parts.push(`${newFolders.length} folders, ${newFiles.length} files added`);
+      parts.push(
+        `${newFolders.length} folders, ${newFiles.length} files added`,
+      );
     if (changedFiles.length) parts.push(`${changedFiles.length} files updated`);
     addToast(
       parts.length ? `Imported: ${parts.join(", ")}` : "Nothing new to import",
     );
   };
-
   if (!room) return <div style={styles.loading}>Loading room...</div>;
 
   const isHtml = activeFile?.language === "html";
@@ -714,6 +718,8 @@ export default function Room() {
           onDone={() => removeToast(t.id)}
         />
       ))}
+
+      <FileChangeCenter changes={changes} />
 
       {/* Exit-room confirmation */}
       {confirmExit && (
@@ -757,7 +763,9 @@ export default function Room() {
             <button
               style={{
                 ...styles.menuBtn,
-                ...(menuOpen || hoverKey === "menu" ? styles.menuBtnActive : {}),
+                ...(menuOpen || hoverKey === "menu"
+                  ? styles.menuBtnActive
+                  : {}),
               }}
               onMouseEnter={() => setHoverKey("menu")}
               onMouseLeave={() => setHoverKey(null)}
