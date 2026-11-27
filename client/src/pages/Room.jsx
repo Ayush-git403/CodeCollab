@@ -160,6 +160,16 @@ export default function Room() {
       teardown();
     };
   }, [teardown]);
+
+  // Silent room-wide check: marks files that changed while you were away
+  const fileNamesKey = files
+    .filter((f) => f.type !== "folder")
+    .map((f) => f.name)
+    .join("|");
+  useEffect(() => {
+    if (fileNamesKey) changes.checkRoom(fileNamesKey.split("|"));
+  }, [fileNamesKey]);
+
   // Show the app panel automatically when a dev server starts
   useEffect(() => {
     if (previewUrl) setAppOpen(true);
@@ -694,6 +704,7 @@ export default function Room() {
       parts.length ? `Imported: ${parts.join(", ")}` : "Nothing new to import",
     );
   };
+
   if (!room) return <div style={styles.loading}>Loading room...</div>;
 
   const isHtml = activeFile?.language === "html";
@@ -864,6 +875,7 @@ export default function Room() {
             onRenameFile={handleRenameFile}
             onCreateFolder={handleCreateFolder}
             onMoveFile={handleMoveFile}
+            pendingChanges={changes.pending}
             username={username}
           />
         </div>
@@ -906,6 +918,7 @@ export default function Room() {
                 const name = f.name.includes("/")
                   ? f.name.split("/").pop()
                   : f.name;
+                const unreviewed = changes.pending[f.name];
                 return (
                   <div
                     key={f.name}
@@ -916,6 +929,12 @@ export default function Room() {
                     onClick={() => handleSelectFile(f)}
                   >
                     <span style={styles.tabName}>{name}</span>
+                    {unreviewed && (
+                      <span
+                        style={styles.tabDot}
+                        title={`Unreviewed changes by ${unreviewed.authors.join(", ")}`}
+                      />
+                    )}
                     <span
                       style={{
                         ...styles.tabClose,
@@ -1404,6 +1423,13 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  tabDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    background: "#E3B341",
+    flexShrink: 0,
   },
   tabClose: {
     color: "#8B949E",

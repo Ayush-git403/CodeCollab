@@ -62,6 +62,31 @@ export default function useFileChanges({ roomId, username }) {
     return () => socket.off("file_changed", onFileChanged);
   }, [roomId, username, pushNotice]);
 
+  // Silent room-wide check: marks files that changed while you were away.
+  // Only files you have viewed before can be checked (that is your baseline).
+  const checkRoom = useCallback(async (filenames) => {
+    if (!roomId || !filenames?.length) return;
+
+    const seen = {};
+    for (const name of filenames) {
+      const id = readSeen(roomId, username, name);
+      if (id !== null && Number.isFinite(id)) seen[name] = id;
+    }
+    if (Object.keys(seen).length === 0) return;
+
+    try {
+      const { data } = await axios.post(
+        `${API_URL}/api/revisions/${roomId}/unreviewed`,
+        { seen }
+      );
+      const found = data.files || {};
+      if (Object.keys(found).length === 0) return;
+      setPending((prev) => ({ ...prev, ...found }));
+    } catch (err) {
+      console.error("checkRoom failed:", err.message);
+    }
+  }, [roomId, username]);
+
   // Call whenever a file becomes the active file
   const checkFile = useCallback(async (filename) => {
     if (!roomId || !filename) return;
@@ -153,6 +178,6 @@ export default function useFileChanges({ roomId, username }) {
 
   return {
     notices, pending, diff, diffLoading,
-    checkFile, saveFile, openDiff, closeDiff, markReviewed, dismissNotice,
+    checkFile, checkRoom, saveFile, openDiff, closeDiff, markReviewed, dismissNotice,
   };
 }

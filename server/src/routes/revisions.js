@@ -1,6 +1,6 @@
 const express = require("express");
 const router  = express.Router();
-const db = require("../models");
+const db      = require("../db"); // same require as your room.js
 
 // Store the file's current content as the "before" version the first time
 // anyone opens or saves it, so there is always something to compare against.
@@ -83,6 +83,46 @@ router.post("/:roomId/open", async (req, res) => {
   } catch (err) {
     console.error("Revision open error:", err.message);
     res.status(500).json({ error: "Failed to load changes" });
+  }
+});
+
+// POST /api/revisions/:roomId/unreviewed
+// body: { seen: { "routes/index.js": 12, "App.jsx": 7 } }
+// Returns every listed file that has saves newer than what the user reviewed.
+router.post("/:roomId/unreviewed", async (req, res) => {
+  const { roomId } = req.params;
+  const seen       = req.body.seen || {};
+
+  const filenames = Object.keys(seen).filter((n) => Number.isFinite(Number(seen[n])));
+  if (filenames.length === 0) return res.json({ files: {} });
+
+  try {
+    const minSeen = Math.min(...filenames.map((n) => Number(seen[n])));
+
+    const rows = await db.query(
+      `SELECT id, filename, saved_by FROM file_revisions
+       WHERE room_id = $1
+         AND filename = ANY($2::text[])
+         AND id > $3
+         AND saved_by <> '__baseline__'
+       ORDER BY id ASC`,
+      [roomId, filenames, minSeen]
+    );
+
+    const files = {};
+    for (const r of rows.rows) {
+      const id = Number(r.id);
+      if (id <= Number(seen[r.filename])) continue; // already reviewed this one
+      const entry = files[r.filename] || { authors: [], latestId: 0 };
+      if (!entry.authors.includes(r.saved_by)) entry.authors.push(r.saved_by);
+      entry.latestId = Math.max(entry.latestId, id);
+      files[r.filename] = entry;
+    }
+
+    res.json({ files });
+  } catch (err) {
+    console.error("Unreviewed check error:", err.message);
+    res.status(500).json({ error: "Failed to check changes" });
   }
 });
 

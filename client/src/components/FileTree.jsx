@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import FileIcon from "./FileIcon";
+import UnreviewedDot from "./UnreviewedDot";
 
 export default function FileTree({
   files, activeFile, onSelect,
   onCreateFile, onDeleteFile, onRenameFile,
   onCreateFolder, onMoveFile, username,
+  pendingChanges = {},
 }) {
   const [creating, setCreating]               = useState(false);
   const [createType, setCreateType]           = useState("file");
@@ -81,6 +83,15 @@ export default function FileTree({
   const parentOf = (name) =>
     name.includes("/") ? name.split("/").slice(0, -1).join("/") : null;
 
+  // Number of files with unreviewed changes anywhere below a folder (any depth)
+  const pendingCountIn = (folderPath) =>
+    files.filter(
+      (f) =>
+        f.type !== "folder" &&
+        f.name.startsWith(`${folderPath}/`) &&
+        pendingChanges[f.name]
+    ).length;
+
   // ── Create / Rename ─────────────────────────────────────────────────────────
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -154,6 +165,7 @@ export default function FileTree({
     const isActive = activeFile === file.name;
     const isHov   = hovered === file.name;
     const isDrag  = dragging === file.name;
+    const unreviewed = pendingChanges[file.name];
 
     return (
       <div key={file.name} style={{ position: "relative" }}>
@@ -204,6 +216,11 @@ export default function FileTree({
             }}>
               {dn}
             </span>
+            {unreviewed && (
+              <UnreviewedDot
+                title={`Unreviewed changes by ${(unreviewed.authors || []).join(", ")}`}
+              />
+            )}
             {isHov && (
               <div style={S.actions}>
                 <button style={S.actionBtn} title="Rename"
@@ -240,6 +257,8 @@ export default function FileTree({
     const isHov  = hovered === `__f__${folder.name}`;
     const subFolders = Object.values(folder.folders);
     const isEmpty = subFolders.length === 0 && folder.files.length === 0;
+    // Only shown while collapsed, so you know something inside needs review
+    const pendingBelow = !isOpen ? pendingCountIn(folder.name) : 0;
 
     return (
       <div key={folder.name}>
@@ -271,6 +290,12 @@ export default function FileTree({
             }}>▸</span>
             {getFolderIcon(isOpen)}
             <span style={S.folderName}>{folder.label}</span>
+            {pendingBelow > 0 && (
+              <UnreviewedDot
+                count={pendingBelow}
+                title={`${pendingBelow} file${pendingBelow > 1 ? "s" : ""} with unreviewed changes`}
+              />
+            )}
             {isOver && (
               <span style={{ color: "#58A6FF", fontSize: 10, flexShrink: 0 }}>
                 drop here
